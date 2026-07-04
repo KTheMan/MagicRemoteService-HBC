@@ -10,7 +10,9 @@ var Dgram = require("dgram");
 
 var bDebug = false;
 var bOverlay = true;
-var bExtend = true;
+// Disabled for the Homebrew Channel variant: this renews LG's temporary
+// Developer Mode session, which doesn't apply to a permanent opkg install.
+var bExtend = false;
 var strAppId = "com.cathwyler.magicremoteservice";
 
 var serService = new Service(strAppId + ".service"); 

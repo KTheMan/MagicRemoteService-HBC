@@ -31,8 +31,12 @@ jobs:
       - name: Generate webosbrew manifest
         run: |
           IPK=$(ls com.cathwyler.magicremoteservice_*.ipk)
-          VERSION=$(node -p "require('./MagicRemoteService/Resources/TV/MagicRemoteService/appinfo.json').version")
           TAG="${GITHUB_REF#refs/tags/}"
+          # Track the release tag here, not appinfo.json's own version field:
+          # upstream doesn't keep that in sync with actual releases (it's
+          # still 1.0.0), and this manifest's version is just repo-listing
+          # metadata - it isn't what the packaged app or opkg validate.
+          VERSION="${TAG#v}"
           SHA256=$(sha256sum "$IPK" | cut -d' ' -f1)
           SIZE=$(stat -c%s "$IPK")
 

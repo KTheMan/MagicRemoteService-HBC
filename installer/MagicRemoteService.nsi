@@ -11,6 +11,16 @@
 ;      (before any window or tray icon is ever created) if that value is
 ;      missing. Seeding it here avoids that crash entirely.
 ;
+;      The .csproj doesn't set Prefer32Bit, and MSBuild's default for an
+;      AnyCPU WinExe targeting .NET Framework 4.5+ is Prefer32Bit=true,
+;      so the process actually runs 32-bit even on 64-bit Windows. That
+;      means it reads HKLM\SOFTWARE\WOW6432Node\... via the WOW64
+;      registry redirector, not the real 64-bit HKLM\SOFTWARE\... - a
+;      64-bit install (e.g. from a 64-bit PowerShell session) writing
+;      only the real view leaves the 32-bit-redirected view empty, and
+;      the app still crashes despite the key visibly "being there".
+;      Writing both views sidesteps needing to know the actual bitness.
+;
 ; Build with: makensis MagicRemoteService.nsi
 ; Expects the built app files (MagicRemoteService.exe, its .config, DLLs,
 ; es/, fr/) in .\payload relative to this script.
@@ -86,11 +96,20 @@ Section "Install"
   ; service, and any elevated GUI launch) and the installing user's HKCU
   ; (a non-elevated GUI launch) - the crash happens in either hive if the
   ; value is missing there, and the check runs per-hive depending on how
-  ; the app is later launched.
+  ; the app is later launched. Written to both the 64-bit and WOW6432Node
+  ; (32-bit) registry views, since the process's actual bitness isn't
+  ; guaranteed - see the note above.
+  SetRegView 64
   WriteRegStr HKLM "Software\MagicRemoteService" "Version" "${VERSION}"
   WriteRegStr HKLM "Software\MagicRemoteService" "InstallDir" "$INSTDIR"
   SetShellVarContext current
   WriteRegStr HKCU "Software\MagicRemoteService" "Version" "${VERSION}"
+
+  SetRegView 32
+  WriteRegStr HKLM "Software\MagicRemoteService" "Version" "${VERSION}"
+  WriteRegStr HKLM "Software\MagicRemoteService" "InstallDir" "$INSTDIR"
+  WriteRegStr HKCU "Software\MagicRemoteService" "Version" "${VERSION}"
+  SetRegView 64
 
   Call FindInstallUtil
   StrCmp $0 "" installUtilMissing

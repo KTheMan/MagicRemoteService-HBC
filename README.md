@@ -2,7 +2,8 @@
 Use your LG Magic Remote as a Windows mouse and control your PC with the LG Magic Remote from your LG WebOS TV. MagicRemoteService is a Windows service providing computer remote control from a WebOS app on LG WebOS TV. MagicRemoteService work without rooting your TV. Tested with WebOS 6.0 (OLED65C1, OLED48C1) and Windows 10.
 
 - [Source](https://github.com/Cathwyler/MagicRemoteService)
-- [Release](https://github.com/Cathwyler/MagicRemoteService/releases)
+- [Original release](https://github.com/Cathwyler/MagicRemoteService/releases)
+- [This fork's releases (Windows installer + webOS IPK)](https://github.com/KTheMan/MagicRemoteService-HBC/releases)
 
 ## Introduction
 
@@ -18,6 +19,7 @@ There is no encryption data between the TV and the PC. Don't use it if you are u
 
 ## Installation
 
+- Download the latest `MagicRemoteService-Setup-*.exe` from [this fork's Releases page](https://github.com/KTheMan/MagicRemoteService-HBC/releases) and run it. The installer registers and starts the MagicRemoteService Windows Service for you - it's the recommended way to install or update on PC.
 - Install WebOS Command line interface on your PC. Please refer to [CLI Installation](https://webostv.developer.lge.com/develop/tools/cli-installation#how-to-install).
 - Install and activate developer mode app on your LG WebOS TV. Please refer to [Installing Developer Mode app](https://webostv.developer.lge.com/develop/getting-started/developer-mode-app#installing-developer-mode-app) and [Turning Developer Mode on](https://webostv.developer.lge.com/develop/getting-started/developer-mode-app#turning-developer-mode-on).
 - Open MagicRemoteService on PC.
@@ -55,6 +57,8 @@ I strongly recommend adding a Windows automatic screen shutdown to prevent pixel
 ## Updating MagicRemoteService
 After almost all MagicRemoteService updates, for changes to take effect and to prevent compatibility bugs, you need to reinstall the TV app.
 
-Be careful while updating MagicRemoteService on the PC if you have "Automatically launch at startup" option checked or older executable file version running. You need to stop MagicRemoteService in your Windows service list or any running instance and replace the executable file. Otherwise there is a chance, due to the unique allowed running instance and even if you launch a new version, to keep an older version running.
+On PC, just run the latest installer from [Releases](https://github.com/KTheMan/MagicRemoteService-HBC/releases) - it stops the running service/instance and Windows service registration for you before installing over it.
+
+If you're updating manually instead of using the installer, be careful while updating MagicRemoteService on the PC if you have "Automatically launch at startup" option checked or older executable file version running. You need to stop MagicRemoteService in your Windows service list or any running instance and replace the executable file. Otherwise there is a chance, due to the unique allowed running instance and even if you launch a new version, to keep an older version running.
 
 If you want to change the location of the executable file and if you have "Automatically launch at startup" option checked, you need to stop MagicRemoteService in your Windows service list and any running instance. Once you have done it, you will be able to move the executable. Finally, you will need to resave the PC tab to reconfigure the Windows service with the new path.

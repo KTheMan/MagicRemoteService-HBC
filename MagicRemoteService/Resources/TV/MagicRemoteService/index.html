@@ -110,6 +110,68 @@
 			min-width: 30%;
 			max-width: 80%;
 		}
+
+		#config {
+			position: fixed;
+			top: 0;
+			left: 0;
+			height: 100%;
+			width: 100%;
+			box-sizing: border-box;
+			padding: 3rem;
+			overflow: auto;
+			background: #14181c;
+			color: #E6E6E6;
+			pointer-events: auto;
+		}
+		#config .config-panel {
+			max-width: 40rem;
+			margin: 0 auto;
+		}
+		#config .config-row {
+			display: flex;
+			flex-flow: column;
+			margin-bottom: 1.25rem;
+		}
+		#config .config-row label {
+			margin-bottom: 0.5rem;
+			font-size: 1.25rem;
+		}
+		#config .config-row input, #config .config-row select {
+			font-size: 1.25rem;
+			padding: 0.5rem;
+		}
+		#config .config-row.config-checkbox {
+			flex-flow: row;
+			align-items: center;
+		}
+		#config .config-row.config-checkbox label {
+			margin: 0 0 0 0.5rem;
+			order: 2;
+		}
+		#config .config-buttons {
+			flex-flow: row;
+			justify-content: flex-end;
+		}
+		#config .config-buttons button {
+			margin-left: 1rem;
+			padding: 0.75rem 1.5rem;
+			font-size: 1.25rem;
+		}
+		#config .config-list-item {
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			padding: 1rem;
+			margin-bottom: 0.5rem;
+			background: #2a2f36;
+			border-radius: 0.5rem;
+			font-size: 1.25rem;
+		}
+		#config .config-list-item button {
+			margin-left: 0.5rem;
+			padding: 0.5rem 1rem;
+		}
 	</style>
 </head>
 
@@ -125,6 +187,50 @@
 	</div>
 	<div class="screen">
 		<div id="uncaught"></div>
+	</div>
+
+	<div id="config" style="display:none;">
+		<div class="config-panel">
+			<h1 id="configTitle"></h1>
+		</div>
+		<div id="configList" class="config-panel"></div>
+		<div class="config-panel">
+			<button id="configAddButton" type="button"></button>
+		</div>
+		<div id="configForm" class="config-panel" style="display:none;">
+			<div class="config-row">
+				<label id="configInputLabel" for="configInput"></label>
+				<select id="configInput"></select>
+			</div>
+			<div class="config-row">
+				<label id="configIpLabel" for="configIp"></label>
+				<input id="configIp" type="text" placeholder="192.168.1.50" />
+			</div>
+			<div class="config-row">
+				<label id="configPortLabel" for="configPort"></label>
+				<input id="configPort" type="number" />
+			</div>
+			<div class="config-row">
+				<label id="configMaskLabel" for="configMask"></label>
+				<input id="configMask" type="text" placeholder="255.255.255.0" />
+			</div>
+			<div class="config-row">
+				<label id="configMacLabel" for="configMac"></label>
+				<input id="configMac" type="text" placeholder="AA:BB:CC:DD:EE:FF" />
+			</div>
+			<div class="config-row">
+				<label id="configLongClickLabel" for="configLongClick"></label>
+				<input id="configLongClick" type="number" />
+			</div>
+			<div class="config-row config-checkbox">
+				<input id="configInputDirect" type="checkbox" />
+				<label id="configInputDirectLabel" for="configInputDirect"></label>
+			</div>
+			<div class="config-row config-buttons">
+				<button id="configCancelButton" type="button"></button>
+				<button id="configSaveButton" type="button"></button>
+			</div>
+		</div>
 	</div>
 
 	<script type="text/javascript">

@@ -72,29 +72,23 @@ const MessageType = {
 	Shutdown: 0x06
 }
 
-const bInputDirect = true;
-const bOverlay = true;
 const uiRemoteEvent = 200;
-const uiLongClick = 1500;
-const strInputId = "HDMI";
-const strInputAppId = "com.webos.app.hdmi";
-const strInputName = "HDMI";
-const strInputSource = "ext://hdmi";
-const strIP = "127.0.0.1";
-const uiPort = 41230;
-const strMask = "255.255.255.0";
-const strMac = "AA:AA:AA:AA:AA:AA";
-const strBroadcast = strIP.split(".").map(function(x, i) {
-	return(x | (parseInt(strMask.split(".")[i], 10) ^ 0xFF)).toString(10);
-}).join(".");
-const arrMac = strMac.split(":").map(function(x) {
-	return parseInt(x, 16);
-});
+const strAppId = "com.cathwyler.magicremoteservice";
 const aSensor = {
 	dFactor: 50,
 	dSpeed: 9,
 }
-const strAppId = "com.cathwyler.magicremoteservice";
+
+// Each HDMI input the user configures gets its own PC connection profile,
+// picked at runtime (see ProfilesLoad/ActivateProfile) instead of being
+// baked into the build like the old per-input packaged installs were.
+const arrInputList = [
+	{ inputId: "HDMI_1", inputAppId: "com.webos.app.hdmi1", inputName: "HDMI 1" },
+	{ inputId: "HDMI_2", inputAppId: "com.webos.app.hdmi2", inputName: "HDMI 2" },
+	{ inputId: "HDMI_3", inputAppId: "com.webos.app.hdmi3", inputName: "HDMI 3" },
+	{ inputId: "HDMI_4", inputAppId: "com.webos.app.hdmi4", inputName: "HDMI 4" }
+];
+var pActive = null;
 
 const strPath = webOS.fetchAppRootPath();
 var arrVersion = null;
@@ -255,51 +249,52 @@ function InputStatus() {
 	return pbInputSourceStatus === true;
 }
 function InputConnected() {};
-if(bInputDirect){
-	InputConnected = function() {
-		if(iIntervalWakeOnLan) {
-			clearInterval(iIntervalWakeOnLan);
-			iIntervalWakeOnLan = 0;
-		}
-		if(iTimeoutSourceStatus) {
-			clearTimeout(iTimeoutSourceStatus);
-			iTimeoutSourceStatus = 0;
-		}
-		if(ScreenExist(deScreenInput)) {
-			ScreenCancel(deScreenInput);
-		}
-	};
-} else {
-	InputConnected = function() {
-		if(ScreenExist(deScreenInput)) {
-			ScreenCancel(deScreenInput);
-		}
-	};
-}
 function InputDisconnected() {};
-if(bInputDirect){
-	InputDisconnected = function() {
-		deScreenInput = Dialog(oString.strAppTittle, oString.strInputDirectDisconnect, [
-			{
-				strName: oString.strInputDirectDisconnectStart,
-				fAction: function() {
-					iIntervalWakeOnLan = startInterval(function() {
-						SendWol({
-							arrMac: arrMac
-						}, strBroadcast);
-					}, 5000);
-					iTimeoutSourceStatus = setTimeout(function() {
-						iTimeoutSourceStatus = 0;
-						deScreenInput = Dialog(oString.strAppTittle, oString.strInputDirectDisconnectWakeOnLanFailure, []);
-					}, 5000);
-				}
+// Picks the InputConnected/InputDisconnected behavior for the active profile -
+// previously a compile-time bInputDirect constant, now per-profile at runtime.
+function ApplyInputDirectBehavior(bInputDirect) {
+	if(bInputDirect) {
+		InputConnected = function() {
+			if(iIntervalWakeOnLan) {
+				clearInterval(iIntervalWakeOnLan);
+				iIntervalWakeOnLan = 0;
 			}
-		]);
-	};
-} else {
-	InputDisconnected = function() {
-		deScreenInput = Dialog(oString.strAppTittle, oString.strInputIndirectDisconnect, []);
-	};
+			if(iTimeoutSourceStatus) {
+				clearTimeout(iTimeoutSourceStatus);
+				iTimeoutSourceStatus = 0;
+			}
+			if(ScreenExist(deScreenInput)) {
+				ScreenCancel(deScreenInput);
+			}
+		};
+		InputDisconnected = function() {
+			deScreenInput = Dialog(oString.strAppTittle, oString.strInputDirectDisconnect, [
+				{
+					strName: oString.strInputDirectDisconnectStart,
+					fAction: function() {
+						iIntervalWakeOnLan = startInterval(function() {
+							SendWol({
+								arrMac: pActive.arrMac
+							}, pActive.strBroadcast);
+						}, 5000);
+						iTimeoutSourceStatus = setTimeout(function() {
+							iTimeoutSourceStatus = 0;
+							deScreenInput = Dialog(oString.strAppTittle, oString.strInputDirectDisconnectWakeOnLanFailure, []);
+						}, 5000);
+					}
+				}
+			]);
+		};
+	} else {
+		InputConnected = function() {
+			if(ScreenExist(deScreenInput)) {
+				ScreenCancel(deScreenInput);
+			}
+		};
+		InputDisconnected = function() {
+			deScreenInput = Dialog(oString.strAppTittle, oString.strInputIndirectDisconnect, []);
+		};
+	}
 }
 function SubscriptionInputStatus() {
 	webOS.service.request("luna://com.webos.service.eim", {
@@ -312,9 +307,13 @@ function SubscriptionInputStatus() {
 				case true:
 					LogIfDebug(oString.strGetAllInputStatusSuccess);
 				case undefined:
+					if(pActive === null) {
+						ProbeActiveProfile(inResponse.devices);
+						break;
+					}
 					var pbLastInputSourceStatus = pbInputSourceStatus;
 					inResponse.devices.forEach(function(dDevice) {
-						if(strInputId === dDevice.id) {
+						if(pActive.inputId === dDevice.id) {
 							pbInputSourceStatus = dDevice.activate;
 						}
 					});
@@ -341,66 +340,302 @@ function SubscriptionInputStatus() {
 		},
 		onFailure: function(inError) {
 			Error(oString.strGetAllInputStatusFailure + " [", inError.errorCode, ", ", inError.errorText, "]");
-			Open();
+			if(pActive !== null) {
+				Open();
+			}
 		}
 	});
 }
 
-function SubscriptionScreenSaverRequest() {
-	webOS.service.request("luna://com.webos.service.tvpower", { 
-		method: "power/registerScreenSaverRequest", 
-		parameters: {
-			clientName: strAppId,
-			subscribe: true
-		}, 
+// Checks whether the TV's currently active input matches one of the user's
+// saved profiles - if so, this launch was triggered by switching to a bound
+// input, so skip straight to the normal remote-control overlay. Otherwise
+// this is a plain Home-launcher open, so show the configuration screen.
+function ProbeActiveProfile(arrDevice) {
+	var arrProfile = ProfilesLoad();
+	var pMatch = null;
+	(arrDevice || []).forEach(function(dDevice) {
+		if(dDevice.activate) {
+			arrProfile.forEach(function(pProfile) {
+				if(pProfile.inputId === dDevice.id) {
+					pMatch = pProfile;
+				}
+			});
+		}
+	});
+	if(pMatch !== null) {
+		ActivateProfile(pMatch);
+	} else {
+		ShowConfig(arrProfile);
+	}
+}
+
+// One-shot re-check used right after the config screen adds/removes a
+// profile, so saving one while already on the matching input can switch
+// straight into remote-control mode without needing a relaunch.
+function RefreshActiveProfile() {
+	webOS.service.request("luna://com.webos.service.eim", {
+		method: "getAllInputStatus",
+		parameters: {},
 		onSuccess: function(inResponse) {
-			switch(inResponse.subscribed) {
-				case undefined:
-					if(AppVisible() && AppFocus() && iCursor == 0) {
-						webOS.service.request("luna://com.webos.service.tvpower", { 
-							method: "power/responseScreenSaverRequest", 
-							parameters: {
-								clientName: strAppId,
-								ack: socClient === null || socClient.readyState !== WebSocket.OPEN,
-								timestamp: inResponse.timestamp
-							},
-							onSuccess: function(inResponse) {
-								LogIfDebug(oString.strResponseScreenSaverRequestSuccess);
-							},
-							onFailure: function(inError) {
-								switch(inError.errorCode) {
-									case "-13":
-										console.error(oString.strResponseScreenSaverRequestFailure + " [", inError.errorCode, ", ", inError.errorText, "]");
-										break;
-									default:
-										Error(oString.strResponseScreenSaverRequestFailure + " [", inError.errorCode, ", ", inError.errorText, "]");
-										break;
-								}
-							} 
-						});
-					}
-					break;
-				case true:
-					LogIfDebug(oString.strRegisterScreenSaverRequestSubscribe);
-					break;
-				default:
-					Error(oString.strRegisterScreenSaverRequestFailure);
-					break;
+			if(pActive === null) {
+				ProbeActiveProfile(inResponse.devices);
 			}
-		}, 
-		onFailure: function(inError) {
-			switch(inError.errorCode) {
-				case "-1":
-				case "-3":
-					console.error(oString.strRegisterScreenSaverRequestFailure + " [", inError.errorCode, ", ", inError.errorText, "]");
-					break;
-				default:
-					Error(oString.strRegisterScreenSaverRequestFailure + " [", inError.errorCode, ", ", inError.errorText, "]");
-					break;
-			}
-		} 
+		},
+		onFailure: function() {}
 	});
 }
+
+function ActivateProfile(pProfile) {
+	pActive = pProfile;
+	pActive.arrMac = pProfile.mac.split(":").map(function(x) {
+		return parseInt(x, 16);
+	});
+	pActive.strBroadcast = pProfile.sendIp.split(".").map(function(x, i) {
+		return (x | (parseInt(pProfile.mask.split(".")[i], 10) ^ 0xFF)).toString(10);
+	}).join(".");
+	ApplyInputDirectBehavior(pProfile.inputDirect);
+	ApplySocketBehavior(pProfile.inputDirect);
+	HideConfig();
+	SubscriptionGetSensorData();
+	SubscriptionDomEvent();
+	SubscriptionClose();
+	LaunchInput();
+}
+
+// ---- Profile persistence ----
+
+const strProfilesKey = "MagicRemoteServiceProfiles";
+
+function ProfilesLoad() {
+	try {
+		var arrProfile = JSON.parse(localStorage.getItem(strProfilesKey));
+		return Array.isArray(arrProfile) ? arrProfile : [];
+	} catch(eError) {
+		return [];
+	}
+}
+
+function ProfilesSave(arrProfile) {
+	localStorage.setItem(strProfilesKey, JSON.stringify(arrProfile));
+}
+
+// ---- EIM registration ----
+//
+// NOTE: unverified against real hardware. addDevice/deleteDevice only take a
+// single shared appId (there's no separate per-input identifier in the
+// payload), so it's not confirmed whether EIM can bind one appId to several
+// physical inputs independently, or whether deleteDevice for one profile
+// would also drop every other bound input under the same appId. To be safe,
+// deleteDevice is only called when removing the last remaining profile -
+// removing one of several just updates the local profile list.
+
+function EimAddDevice(pProfile, fSuccess, fFailure) {
+	webOS.service.request("luna://com.webos.service.eim", {
+		method: "addDevice",
+		parameters: {
+			appId: strAppId,
+			pigImage: "",
+			mvpdIcon: "",
+			type: "MVPD_IP",
+			showPopup: true,
+			label: oString.strAppTittle,
+			description: pProfile.inputName
+		},
+		onSuccess: fSuccess,
+		onFailure: fFailure
+	});
+}
+
+function EimRemoveDevice(fSuccess, fFailure) {
+	webOS.service.request("luna://com.webos.service.eim", {
+		method: "deleteDevice",
+		parameters: {
+			appId: strAppId
+		},
+		onSuccess: fSuccess,
+		onFailure: fFailure
+	});
+}
+
+// ---- Configuration screen ----
+//
+// Shown when Load()/ProbeActiveProfile() find no saved profile matching the
+// TV's current input - i.e. this was a plain Home-launcher open rather than
+// a switch to a bound HDMI input.
+
+var deConfig = document.getElementById("config");
+var deConfigList = document.getElementById("configList");
+var deConfigForm = document.getElementById("configForm");
+var deConfigInput = document.getElementById("configInput");
+var deConfigIp = document.getElementById("configIp");
+var deConfigPort = document.getElementById("configPort");
+var deConfigMask = document.getElementById("configMask");
+var deConfigMac = document.getElementById("configMac");
+var deConfigLongClick = document.getElementById("configLongClick");
+var deConfigInputDirect = document.getElementById("configInputDirect");
+var strConfigEditingInputId = null;
+
+function ShowConfig(arrProfile) {
+	document.getElementById("configTitle").innerText = oString.strAppTittle;
+	document.getElementById("configAddButton").innerText = oString.strConfigAddProfile;
+	document.getElementById("configInputLabel").innerText = oString.strConfigInputLabel;
+	document.getElementById("configIpLabel").innerText = oString.strConfigPCIPLabel;
+	document.getElementById("configPortLabel").innerText = oString.strConfigPCPortLabel;
+	document.getElementById("configMaskLabel").innerText = oString.strConfigPCMaskLabel;
+	document.getElementById("configMacLabel").innerText = oString.strConfigPCMacLabel;
+	document.getElementById("configLongClickLabel").innerText = oString.strConfigLongClickLabel;
+	document.getElementById("configInputDirectLabel").innerText = oString.strConfigInputDirectLabel;
+	document.getElementById("configSaveButton").innerText = oString.strConfigSaveProfile;
+	document.getElementById("configCancelButton").innerText = oString.strConfigCancel;
+	RenderConfigList(arrProfile);
+	deConfig.style.display = "";
+}
+
+function HideConfig() {
+	deConfig.style.display = "none";
+}
+
+function RenderConfigList(arrProfile) {
+	deConfigList.innerHTML = "";
+	deConfigForm.style.display = "none";
+	if(arrProfile.length === 0) {
+		var deEmpty = document.createElement("div");
+		deEmpty.innerText = oString.strConfigNoProfiles;
+		deConfigList.appendChild(deEmpty);
+	} else {
+		arrProfile.forEach(function(pProfile) {
+			var deItem = document.createElement("div");
+			deItem.className = "config-list-item";
+			var deLabel = document.createElement("span");
+			deLabel.innerText = pProfile.inputName + " - " + pProfile.sendIp;
+			deItem.appendChild(deLabel);
+			var deButtonGroup = document.createElement("span");
+			var deEditButton = document.createElement("button");
+			deEditButton.type = "button";
+			deEditButton.innerText = oString.strConfigEditProfile;
+			deEditButton.addEventListener("click", function() {
+				OpenConfigForm(pProfile);
+			});
+			var deDeleteButton = document.createElement("button");
+			deDeleteButton.type = "button";
+			deDeleteButton.innerText = oString.strConfigDeleteProfile;
+			deDeleteButton.addEventListener("click", function() {
+				DeleteProfile(pProfile);
+			});
+			deButtonGroup.appendChild(deEditButton);
+			deButtonGroup.appendChild(deDeleteButton);
+			deItem.appendChild(deButtonGroup);
+			deConfigList.appendChild(deItem);
+		});
+	}
+}
+
+function PopulateConfigInputOptions(strSelectedInputId) {
+	deConfigInput.innerHTML = "";
+	var arrProfile = ProfilesLoad();
+	arrInputList.forEach(function(pInput) {
+		var bUsed = arrProfile.some(function(pProfile) {
+			return pProfile.inputId === pInput.inputId && pInput.inputId !== strConfigEditingInputId;
+		});
+		if(!bUsed) {
+			var deOption = document.createElement("option");
+			deOption.value = pInput.inputId;
+			deOption.innerText = pInput.inputName;
+			if(pInput.inputId === strSelectedInputId) {
+				deOption.selected = true;
+			}
+			deConfigInput.appendChild(deOption);
+		}
+	});
+}
+
+function OpenConfigForm(pProfile) {
+	strConfigEditingInputId = pProfile ? pProfile.inputId : null;
+	PopulateConfigInputOptions(pProfile ? pProfile.inputId : null);
+	deConfigInput.disabled = !!pProfile;
+	deConfigIp.value = pProfile ? pProfile.sendIp : "";
+	deConfigPort.value = pProfile ? pProfile.sendPort : 41230;
+	deConfigMask.value = pProfile ? pProfile.mask : "255.255.255.0";
+	deConfigMac.value = pProfile ? pProfile.mac : "";
+	deConfigLongClick.value = pProfile ? pProfile.longClick : 1500;
+	deConfigInputDirect.checked = pProfile ? pProfile.inputDirect : true;
+	deConfigForm.style.display = "";
+}
+
+function ValidIPv4(strValue) {
+	return typeof strValue === "string" && /^(\d{1,3}\.){3}\d{1,3}$/.test(strValue) && strValue.split(".").every(function(x) {
+		return parseInt(x, 10) <= 255;
+	});
+}
+
+function ValidMac(strValue) {
+	return typeof strValue === "string" && /^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$/.test(strValue);
+}
+
+function SaveConfigForm() {
+	var pInput = arrInputList.filter(function(x) {
+		return x.inputId === deConfigInput.value;
+	})[0];
+	if(!pInput || !ValidIPv4(deConfigIp.value) || !ValidIPv4(deConfigMask.value) || !ValidMac(deConfigMac.value)) {
+		Error(oString.strConfigValidationError);
+		return;
+	}
+	var pProfile = {
+		inputId: pInput.inputId,
+		inputAppId: pInput.inputAppId,
+		inputName: pInput.inputName,
+		sendIp: deConfigIp.value,
+		sendPort: parseInt(deConfigPort.value, 10) || 41230,
+		mask: deConfigMask.value,
+		mac: deConfigMac.value.toUpperCase(),
+		longClick: parseInt(deConfigLongClick.value, 10) || 1500,
+		inputDirect: deConfigInputDirect.checked
+	};
+	EimAddDevice(pProfile, function() {
+		LogIfDebug(oString.strAddDeviceSuccess);
+		var arrProfile = ProfilesLoad().filter(function(x) {
+			return x.inputId !== pProfile.inputId;
+		});
+		arrProfile.push(pProfile);
+		ProfilesSave(arrProfile);
+		RenderConfigList(arrProfile);
+		RefreshActiveProfile();
+	}, function(inError) {
+		Error(oString.strAddDeviceFailure + " [", inError.errorCode, ", ", inError.errorText, "]");
+	});
+}
+
+function DeleteProfile(pProfile) {
+	var arrRemaining = ProfilesLoad().filter(function(x) {
+		return x.inputId !== pProfile.inputId;
+	});
+	function OnRemoved() {
+		ProfilesSave(arrRemaining);
+		RenderConfigList(arrRemaining);
+	}
+	if(arrRemaining.length === 0) {
+		EimRemoveDevice(function() {
+			LogIfDebug(oString.strRemoveDeviceSuccess);
+			OnRemoved();
+		}, function(inError) {
+			Error(oString.strRemoveDeviceFailure + " [", inError.errorCode, ", ", inError.errorText, "]");
+		});
+	} else {
+		OnRemoved();
+	}
+}
+
+document.getElementById("configAddButton").addEventListener("click", function() {
+	OpenConfigForm(null);
+});
+document.getElementById("configCancelButton").addEventListener("click", function() {
+	RenderConfigList(ProfilesLoad());
+});
+document.getElementById("configSaveButton").addEventListener("click", function() {
+	SaveConfigForm();
+});
+
 var pCurrent = {
 	dRhoAccelerationTotal: 0,
 	dRhoAccelerationNextReset: 0,
@@ -584,7 +819,7 @@ function LaunchInput() {
 	webOS.service.request("luna://com.webos.applicationManager", {
 		method: "launch",
 		parameters: {
-			id: strInputAppId
+			id: pActive.inputAppId
 		},
 		onSuccess: function(inResponse) {
 			LogIfDebug(oString.strLaunchSuccess);
@@ -687,7 +922,7 @@ function SetLongClick() {
 			usC: 0x02,
 			bS: false
 		});
-	}, uiLongClick);
+	}, pActive.longClick);
 	pLongClick.dX = pCurrent.dX;
 	pLongClick.dY = pCurrent.dY;
 }
@@ -873,61 +1108,62 @@ var iIntervalRetryOpen = 0;
 var iTimeoutOpen = 0;
 var socClient = null;
 function SocketOpened() {};
-if(bInputDirect){
-	SocketOpened = function() {
-		if(iTimeoutOpen) {
-			clearTimeout(iTimeoutOpen);
-			iTimeoutOpen = 0;
-		}
-		if(ScreenExist(deScreenOpen)) {
-			ScreenCancel(deScreenOpen);
-		}
-	}
-} else {
-	SocketOpened = function() {
-		if(iTimeoutOpen) {
-			clearTimeout(iTimeoutOpen);
-			iTimeoutOpen = 0;
-		}
-		if(iIntervalWakeOnLan) {
-			clearInterval(iIntervalWakeOnLan);
-			iIntervalWakeOnLan = 0;
-		}
-		if(ScreenExist(deScreenOpen)) {
-			ScreenCancel(deScreenOpen);
-		}
-	}
-}
 function SocketClosed() {};
-if(bInputDirect){
-	SocketClosed = function() {
-		iTimeoutOpen = setTimeout(function() {
-			iTimeoutOpen = 0;
-			deScreenOpen = Dialog(oString.strAppTittle, oString.strSocketOpenTimeout, []);
-		}, 30000);
-	};
-} else {
-	SocketClosed = function() {
-		deScreenOpen = Dialog(oString.strAppTittle, oString.strSocketOpen, [
-			{
-				strName: oString.strSocketOpenStart,
-				fAction: function() {
-					iIntervalWakeOnLan = startInterval(function() {
-						SendWol({
-							arrMac: arrMac
-						}, strBroadcast);
-					}, 5000);
-					iTimeoutOpen = setTimeout(function() {
-						iTimeoutOpen = 0;
-						deScreenOpen = Dialog(oString.strAppTittle, oString.strSocketOpenTimeoutWakeOnLanFailure, []);
-					}, 30000);
-				}
+// Picks the SocketOpened/SocketClosed behavior for the active profile -
+// previously a compile-time bInputDirect constant, now per-profile at runtime.
+function ApplySocketBehavior(bInputDirect) {
+	if(bInputDirect) {
+		SocketOpened = function() {
+			if(iTimeoutOpen) {
+				clearTimeout(iTimeoutOpen);
+				iTimeoutOpen = 0;
 			}
-		]);
-	};
+			if(ScreenExist(deScreenOpen)) {
+				ScreenCancel(deScreenOpen);
+			}
+		}
+		SocketClosed = function() {
+			iTimeoutOpen = setTimeout(function() {
+				iTimeoutOpen = 0;
+				deScreenOpen = Dialog(oString.strAppTittle, oString.strSocketOpenTimeout, []);
+			}, 30000);
+		};
+	} else {
+		SocketOpened = function() {
+			if(iTimeoutOpen) {
+				clearTimeout(iTimeoutOpen);
+				iTimeoutOpen = 0;
+			}
+			if(iIntervalWakeOnLan) {
+				clearInterval(iIntervalWakeOnLan);
+				iIntervalWakeOnLan = 0;
+			}
+			if(ScreenExist(deScreenOpen)) {
+				ScreenCancel(deScreenOpen);
+			}
+		}
+		SocketClosed = function() {
+			deScreenOpen = Dialog(oString.strAppTittle, oString.strSocketOpen, [
+				{
+					strName: oString.strSocketOpenStart,
+					fAction: function() {
+						iIntervalWakeOnLan = startInterval(function() {
+							SendWol({
+								arrMac: pActive.arrMac
+							}, pActive.strBroadcast);
+						}, 5000);
+						iTimeoutOpen = setTimeout(function() {
+							iTimeoutOpen = 0;
+							deScreenOpen = Dialog(oString.strAppTittle, oString.strSocketOpenTimeoutWakeOnLanFailure, []);
+						}, 30000);
+					}
+				}
+			]);
+		};
+	}
 }
 function SocketOpen() {
-	socClient = new WebSocket("ws://" + strIP + ":" + uiPort);
+	socClient = new WebSocket("ws://" + pActive.sendIp + ":" + pActive.sendPort);
 	socClient.binaryType = "arraybuffer";
 	socClient.onopen = function(e) {
 		LogIfDebug(oString.strSocketOpened);
@@ -1062,9 +1298,9 @@ function SendPositionRelative(pPositionRelative) {
 			dwPositionRelative.setInt16(1, pPositionRelative.sX, true);
 			dwPositionRelative.setInt16(3, pPositionRelative.sY, true);
 			socClient.send(bufPositionRelative);
-			//LogIfDebug(oString.strSendPositionRelativeSuccess + " [0x" + bufPositionRelative.toString(16) + "]@" + strIP + ":" + uiPort + " ", pPositionRelative);
+			//LogIfDebug(oString.strSendPositionRelativeSuccess + " [0x" + bufPositionRelative.toString(16) + "]@" + pActive.sendIp + ":" + pActive.sendPort + " ", pPositionRelative);
 		} catch(eError) {
-			Error(oString.strSendPositionRelativeFailure + " [", eError, "]@" + strIP + ":" + uiPort + " ", pPositionRelative);
+			Error(oString.strSendPositionRelativeFailure + " [", eError, "]@" + pActive.sendIp + ":" + pActive.sendPort + " ", pPositionRelative);
 		}
 	}
 }
@@ -1078,9 +1314,9 @@ function SendPositionAbsolute(pPositionAbsolute) {
 			dwPositionAbsolute.setUint16(1, pPositionAbsolute.usX, true);
 			dwPositionAbsolute.setUint16(3, pPositionAbsolute.usY, true);
 			socClient.send(bufPositionAbsolute);
-			//LogIfDebug(oString.strSendPositionAbsoluteSuccess + " [0x" + bufPositionAbsolute.toString(16) + "]@" + strIP + ":" + uiPort + " ", pPositionAbsolute);
+			//LogIfDebug(oString.strSendPositionAbsoluteSuccess + " [0x" + bufPositionAbsolute.toString(16) + "]@" + pActive.sendIp + ":" + pActive.sendPort + " ", pPositionAbsolute);
 		} catch(eError) {
-			Error(oString.strSendPositionAbsoluteFailure + " [", eError, "]@" + strIP + ":" + uiPort + " ", pPositionAbsolute);
+			Error(oString.strSendPositionAbsoluteFailure + " [", eError, "]@" + pActive.sendIp + ":" + pActive.sendPort + " ", pPositionAbsolute);
 		}
 	}
 }
@@ -1093,9 +1329,9 @@ function SendWheel(wWheel) {
 		try {
 			dwWheel.setInt16(1, wWheel.sY, true);
 			socClient.send(bufWheel);
-			LogIfDebug(oString.strSendWheelSuccess + " [0x" + bufWheel.toString(16) + "]@" + strIP + ":" + uiPort + " ", wWheel);
+			LogIfDebug(oString.strSendWheelSuccess + " [0x" + bufWheel.toString(16) + "]@" + pActive.sendIp + ":" + pActive.sendPort + " ", wWheel);
 		} catch(eError) {
-			Error(oString.strSendWheelFailure + " [", eError, "]@" + strIP + ":" + uiPort + " ", wWheel);
+			Error(oString.strSendWheelFailure + " [", eError, "]@" + pActive.sendIp + ":" + pActive.sendPort + " ", wWheel);
 		}
 	}
 }
@@ -1108,9 +1344,9 @@ function SendVisible(vVisible) {
 		try {
 			dwVisible.setUint8(1, vVisible.bV);
 			socClient.send(bufVisible);
-			LogIfDebug(oString.strSendVisibleSuccess + " [0x" + bufVisible.toString(16) + "]@" + strIP + ":" + uiPort + " ", vVisible);
+			LogIfDebug(oString.strSendVisibleSuccess + " [0x" + bufVisible.toString(16) + "]@" + pActive.sendIp + ":" + pActive.sendPort + " ", vVisible);
 		} catch(eError) {
-			Error(oString.strSendVisibleFailure + " [", eError, "]@" + strIP + ":" + uiPort + " ", vVisible);
+			Error(oString.strSendVisibleFailure + " [", eError, "]@" + pActive.sendIp + ":" + pActive.sendPort + " ", vVisible);
 		}
 	}
 }
@@ -1124,9 +1360,9 @@ function SendKey(kKey) {
 			dwKey.setUint16(1, kKey.usC, true);
 			dwKey.setUint8(3, kKey.bS);
 			socClient.send(bufKey);
-			LogIfDebug(oString.strSendKeySuccess + " [0x" + bufKey.toString(16) + "]@" + strIP + ":" + uiPort + " ", kKey);
+			LogIfDebug(oString.strSendKeySuccess + " [0x" + bufKey.toString(16) + "]@" + pActive.sendIp + ":" + pActive.sendPort + " ", kKey);
 		} catch(eError) {
-			Error(oString.strSendKeyFailure + " [", eError, "]@" + strIP + ":" + uiPort + " ", kKey);
+			Error(oString.strSendKeyFailure + " [", eError, "]@" + pActive.sendIp + ":" + pActive.sendPort + " ", kKey);
 		}
 	}
 }
@@ -1139,9 +1375,9 @@ function SendUnicode(kUnicode) {
 		try {
 			dwUnicode.setUint16(1, kUnicode.usC, true);
 			socClient.send(bufUnicode);
-			LogIfDebug(oString.strSendUnicodeSuccess + " [0x" + bufUnicode.toString(16) + "]@" + strIP + ":" + uiPort + " ", kUnicode);
+			LogIfDebug(oString.strSendUnicodeSuccess + " [0x" + bufUnicode.toString(16) + "]@" + pActive.sendIp + ":" + pActive.sendPort + " ", kUnicode);
 		} catch(eError) {
-			Error(oString.strSendUnicodeFailure + " [", eError, "]@" + strIP + ":" + uiPort + " ", kUnicode);
+			Error(oString.strSendUnicodeFailure + " [", eError, "]@" + pActive.sendIp + ":" + pActive.sendPort + " ", kUnicode);
 		}
 	}
 }
@@ -1153,9 +1389,9 @@ function SendShutdown() {
 	if(socClient !== null && socClient.readyState === WebSocket.OPEN) {
 		try {
 			socClient.send(bufShutdown);
-			LogIfDebug(oString.strSendShutdownSuccess + " [0x" + bufShutdown.toString(16) + "]@" + strIP + ":" + uiPort);
+			LogIfDebug(oString.strSendShutdownSuccess + " [0x" + bufShutdown.toString(16) + "]@" + pActive.sendIp + ":" + pActive.sendPort);
 		} catch(eError) {
-			Error(oString.strSendShutdownFailure + " [", eError, "]@" + strIP + ":" + uiPort);
+			Error(oString.strSendShutdownFailure + " [", eError, "]@" + pActive.sendIp + ":" + pActive.sendPort);
 		}
 	}
 }
@@ -1251,18 +1487,10 @@ function Load() {
 		}
 
 		SubscriptionLog();
+		// This decides config-screen vs remote-control mode by checking whether
+		// the TV's active input matches a saved profile - see ProbeActiveProfile.
+		// SubscriptionGetSensorData/SubscriptionDomEvent/SubscriptionClose/LaunchInput
+		// only start once ActivateProfile() picks a profile.
 		SubscriptionInputStatus();
-		SubscriptionGetSensorData();
-		SubscriptionDomEvent();
-		if(bOverlay) {
-			SubscriptionClose();
-			LaunchInput();
-		} else {
-			SubscriptionScreenSaverRequest();
-			var deSource = document.createElement("source");
-			deSource.setAttribute("src", strInputSource);
-			deSource.setAttribute("type", "service/webos-external");
-			deVideo.appendChild(deSource);
-		}
 	}
 }

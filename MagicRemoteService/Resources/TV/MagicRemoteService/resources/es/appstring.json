@@ -10,6 +10,10 @@
 	"strGetAllInputStatusFailure": "Fallo al obtener el estado de todas las entradas",
 	"strAddDeviceSuccess": "Se ha añadido el dispositivo correctamente",
 	"strAddDeviceFailure": "Fallo al añadir dispositivo",
+	"strRemoveDeviceSuccess": "Se ha eliminado el dispositivo correctamente",
+	"strRemoveDeviceFailure": "Fallo al eliminar el dispositivo",
+	"strAddDeviceSuccess": "Se ha añadido el dispositivo correctamente",
+	"strAddDeviceFailure": "Fallo al añadir dispositivo",
 	"strRegisterScreenSaverRequestSubscribe": "Se ha iniciado la solicitud de registro del protector de pantalla",
 	"strRegisterScreenSaverRequestFailure": "Fallo al registrar la solicitud del protector de pantalla",
 	"strResponseScreenSaverRequestSuccess": "Respuesta correcta de la solicitud del protector de pantalla",
@@ -55,5 +59,20 @@
 	"strSocketErrorClose": "Se ha cerrado el zócalo",
 	"strShutdownMessage": "Desea apagar el ordenador remoto ?",
 	"strShutdownShutdown": "Apagar",
-	"strShutdownAbort": "No hacer nada"
+	"strShutdownAbort": "No hacer nada",
+
+	"strConfigAddProfile": "Añadir entrada",
+	"strConfigEditProfile": "Editar",
+	"strConfigDeleteProfile": "Eliminar",
+	"strConfigSaveProfile": "Guardar",
+	"strConfigCancel": "Cancelar",
+	"strConfigInputLabel": "Entrada de vídeo",
+	"strConfigPCIPLabel": "Dirección IP del ordenador",
+	"strConfigPCPortLabel": "Puerto del ordenador",
+	"strConfigPCMaskLabel": "Máscara de subred",
+	"strConfigPCMacLabel": "Dirección MAC del ordenador (Wake on LAN)",
+	"strConfigLongClickLabel": "Duración del clic largo (ms)",
+	"strConfigInputDirectLabel": "La entrada indica el estado de conexión directamente",
+	"strConfigNoProfiles": "Todavía no hay entradas configuradas. Seleccione \"Añadir entrada\" para configurar una.",
+	"strConfigValidationError": "Seleccione una entrada e introduzca una dirección IP, máscara de subred y dirección MAC válidas."
 }

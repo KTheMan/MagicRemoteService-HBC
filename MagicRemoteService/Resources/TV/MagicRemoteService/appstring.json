@@ -11,6 +11,8 @@
 	"strGetAllInputStatusFailure": "Failed to get all input status",
 	"strAddDeviceSuccess": "Success to add device",
 	"strAddDeviceFailure": "Failed to add device",
+	"strRemoveDeviceSuccess": "Success to remove device",
+	"strRemoveDeviceFailure": "Failed to remove device",
 	"strRegisterScreenSaverRequestSubscribe": "Start to register screensaver request",
 	"strRegisterScreenSaverRequestFailure": "Failed to register screensaver request",
 	"strResponseScreenSaverRequestSuccess": "Success to response screensaver request",
@@ -64,5 +66,20 @@
 	"strSocketErrorClose": "Socket already closed",
 	"strShutdownMessage": "Do you want to shutdown the remote computer ?",
 	"strShutdownShutdown": "Shutdown",
-	"strShutdownAbort": "Do nothing"
+	"strShutdownAbort": "Do nothing",
+
+	"strConfigAddProfile": "Add Input",
+	"strConfigEditProfile": "Edit",
+	"strConfigDeleteProfile": "Delete",
+	"strConfigSaveProfile": "Save",
+	"strConfigCancel": "Cancel",
+	"strConfigInputLabel": "Video Input",
+	"strConfigPCIPLabel": "Computer IP Address",
+	"strConfigPCPortLabel": "Computer Port",
+	"strConfigPCMaskLabel": "Subnet Mask",
+	"strConfigPCMacLabel": "Computer MAC Address (Wake on LAN)",
+	"strConfigLongClickLabel": "Long Click Duration (ms)",
+	"strConfigInputDirectLabel": "Input reports connection state directly",
+	"strConfigNoProfiles": "No inputs configured yet. Select \"Add Input\" to set one up.",
+	"strConfigValidationError": "Please choose an input and fill in a valid IP address, subnet mask, and MAC address."
 }

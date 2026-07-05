@@ -47,6 +47,7 @@ namespace MagicRemoteService {
 		private readonly MagicRemoteService.Service mrsService = new MagicRemoteService.Service();
 		private readonly System.Windows.Forms.NotifyIcon niIcon;
 		private MagicRemoteService.Setting sSetting;
+		private string strPendingUpdateUrl;
 		static Application() {
 			MagicRemoteService.Application.psnPowerSettingNotification.naehNotificationArrived += MagicRemoteService.Application.OnPowerSettingNotification;
 		}
@@ -60,15 +61,19 @@ namespace MagicRemoteService {
 				Icon = MagicRemoteService.Properties.Resources.MagicRemoteServiceIcon,
 				ContextMenu = new System.Windows.Forms.ContextMenu(new System.Windows.Forms.MenuItem[] {
 					new System.Windows.Forms.MenuItem(MagicRemoteService.Properties.Resources.ApplicationSetting, this.Setting),
+					new System.Windows.Forms.MenuItem(MagicRemoteService.Properties.Resources.ApplicationCheckForUpdate, this.CheckForUpdate),
 					new System.Windows.Forms.MenuItem(MagicRemoteService.Properties.Resources.ApplicationExit, this.Exit)
 				})
 			};
 			this.niIcon.DoubleClick += this.Setting;
+			this.niIcon.BalloonTipClicked += this.OnUpdateBalloonTipClicked;
 			this.niIcon.Visible = true;
 
 			if((MagicRemoteService.Program.bElevated ? Microsoft.Win32.Registry.LocalMachine : Microsoft.Win32.Registry.CurrentUser).OpenSubKey(@"Software\MagicRemoteService") == null) {
 				this.Setting(this, System.EventArgs.Empty);
 			}
+
+			this.RunUpdateCheck(false);
 		}
 
 		private void VersionScript() {
@@ -111,6 +116,32 @@ namespace MagicRemoteService {
 		}
 		public void Invoke(System.Delegate methode) {
 			MagicRemoteService.Application.iInvoker.Invoke(methode);
+		}
+		public void CheckForUpdate(object sender, System.EventArgs e) {
+			this.RunUpdateCheck(true);
+		}
+		private async void RunUpdateCheck(bool bManual) {
+			MagicRemoteService.UpdateChecker.UpdateInfo uiUpdate;
+			try {
+				uiUpdate = await MagicRemoteService.UpdateChecker.CheckForUpdateAsync().ConfigureAwait(true);
+			} catch(System.Exception ex) {
+				MagicRemoteService.Service.Error("Update check failed: " + ex.Message);
+				if(bManual) {
+					this.niIcon.ShowBalloonTip(5000, "MagicRemoteService", MagicRemoteService.Properties.Resources.UpdateCheckFailedBalloonText, System.Windows.Forms.ToolTipIcon.Error);
+				}
+				return;
+			}
+			if(uiUpdate != null) {
+				this.strPendingUpdateUrl = uiUpdate.ReleaseUrl;
+				this.niIcon.ShowBalloonTip(10000, MagicRemoteService.Properties.Resources.UpdateAvailableBalloonTitle, string.Format(MagicRemoteService.Properties.Resources.UpdateAvailableBalloonText, uiUpdate.LatestVersion), System.Windows.Forms.ToolTipIcon.Info);
+			} else if(bManual) {
+				this.niIcon.ShowBalloonTip(5000, "MagicRemoteService", MagicRemoteService.Properties.Resources.UpToDateBalloonText, System.Windows.Forms.ToolTipIcon.Info);
+			}
+		}
+		private void OnUpdateBalloonTipClicked(object sender, System.EventArgs e) {
+			if(!string.IsNullOrEmpty(this.strPendingUpdateUrl)) {
+				System.Diagnostics.Process.Start(this.strPendingUpdateUrl);
+			}
 		}
 		private void OnExplorerStart(object sender, System.Management.EventArrivedEventArgs e) {
 			this.niIcon.Visible = false;

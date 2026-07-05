@@ -10,6 +10,8 @@
 	"strGetAllInputStatusFailure": "Echec de la récupération l'état des entrées",
 	"strAddDeviceSuccess": "Succès de l'ajout de l'appareil",
 	"strAddDeviceFailure": "Echec de l'ajout de l'appareil",
+	"strRemoveDeviceSuccess": "Succès de la suppression de l'appareil",
+	"strRemoveDeviceFailure": "Echec de la suppression de l'appareil",
 	"strRegisterScreenSaverRequestSubscribe": "Début de l'abonnement à la demande d'écran de veille",
 	"strRegisterScreenSaverRequestFailure": "Echec de l'abonnement à la demande d'écran de veille",
 	"strResponseScreenSaverRequestSuccess": "Succès de la réponse à la demande d'écran de veille",
@@ -63,5 +65,20 @@
 	"strSocketErrorClose": "Socket déjà fermée",
 	"strShutdownMessage": "Voulez-vous éteindre l'ordinateur distant ?",
 	"strShutdownShutdown": "Éteindre",
-	"strShutdownAbort": "Ne rien faire"
+	"strShutdownAbort": "Ne rien faire",
+
+	"strConfigAddProfile": "Ajouter une entrée",
+	"strConfigEditProfile": "Modifier",
+	"strConfigDeleteProfile": "Supprimer",
+	"strConfigSaveProfile": "Enregistrer",
+	"strConfigCancel": "Annuler",
+	"strConfigInputLabel": "Entrée vidéo",
+	"strConfigPCIPLabel": "Adresse IP de l'ordinateur",
+	"strConfigPCPortLabel": "Port de l'ordinateur",
+	"strConfigPCMaskLabel": "Masque de sous-réseau",
+	"strConfigPCMacLabel": "Adresse MAC de l'ordinateur (Wake on LAN)",
+	"strConfigLongClickLabel": "Durée du clic long (ms)",
+	"strConfigInputDirectLabel": "L'entrée signale directement l'état de connexion",
+	"strConfigNoProfiles": "Aucune entrée configurée. Sélectionnez \"Ajouter une entrée\" pour en configurer une.",
+	"strConfigValidationError": "Veuillez choisir une entrée et renseigner une adresse IP, un masque de sous-réseau et une adresse MAC valides."
 }

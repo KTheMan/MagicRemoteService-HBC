@@ -10,7 +10,7 @@ permissions:
   contents: write
 
 jobs:
-  build:
+  build-ipk:
     runs-on: ubuntu-latest
 
     steps:
@@ -26,6 +26,11 @@ jobs:
             MagicRemoteService/Resources/TV/MagicRemoteService \
             MagicRemoteService/Resources/TV/Service \
             -o .
+          # ares-package names the file after appinfo.json's own version
+          # field, which upstream doesn't keep in sync with real releases
+          # (it's still 1.0.0) - drop that segment rather than ship a
+          # filename claiming a version this clearly isn't.
+          mv com.cathwyler.magicremoteservice_*.ipk com.cathwyler.magicremoteservice_all.ipk
           ls -la *.ipk
 
       - name: Generate webosbrew manifest
@@ -55,11 +60,91 @@ jobs:
             > org.webosbrew.manifest.json
           cat org.webosbrew.manifest.json
 
+      - name: Upload ipk + manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: webos-ipk
+          path: |
+            com.cathwyler.magicremoteservice_*.ipk
+            org.webosbrew.manifest.json
+          retention-days: 7
+
+  build-installer:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Set up NuGet
+        uses: NuGet/setup-nuget@v2
+
+      - name: Restore NuGet packages
+        run: nuget restore MagicRemoteService.sln
+
+      - name: Build PC app (Release)
+        run: msbuild MagicRemoteService.sln /p:Configuration=Release /p:Platform="Any CPU" /clp:Summary /nologo
+
+      - name: Assemble installer payload
+        run: |
+          $dest = "installer\payload"
+          New-Item -ItemType Directory -Force -Path $dest | Out-Null
+          Copy-Item "MagicRemoteService\bin\Release\MagicRemoteService.exe" $dest
+          Copy-Item "MagicRemoteService\bin\Release\MagicRemoteService.exe.config" $dest
+          Copy-Item "MagicRemoteService\bin\Release\*.dll" $dest
+          Copy-Item "MagicRemoteService\bin\Release\es" "$dest\es" -Recurse
+          Copy-Item "MagicRemoteService\bin\Release\fr" "$dest\fr" -Recurse
+          Get-ChildItem $dest -Recurse
+
+      - name: Install NSIS
+        run: choco install nsis -y --no-progress
+
+      - name: Build installer
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $version = $tag -replace '^v', ''
+          & "${env:ProgramFiles(x86)}\NSIS\makensis.exe" "/DVERSION=$version" "installer\MagicRemoteService.nsi"
+          Get-ChildItem installer\*.exe
+
+      - name: Upload installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: pc-installer
+          path: installer\MagicRemoteService-Setup-*.exe
+          retention-days: 7
+
+  release:
+    needs: [build-ipk, build-installer]
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download ipk + manifest
+        uses: actions/download-artifact@v4
+        with:
+          name: webos-ipk
+
+      - name: Download installer
+        uses: actions/download-artifact@v4
+        with:
+          name: pc-installer
+
       - name: Release
-        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           files: |
             com.cathwyler.magicremoteservice_*.ipk
             org.webosbrew.manifest.json
+            MagicRemoteService-Setup-*.exe
           generate_release_notes: true
+
+      - name: Notify webos-apps-repo of new release
+        run: |
+          curl -sf -X POST \
+            -H "Authorization: token ${{ secrets.REPO_DISPATCH_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            https://api.github.com/repos/KTheMan/webos-apps-repo/dispatches \
+            -d '{"event_type":"update-bigbookshelf"}'

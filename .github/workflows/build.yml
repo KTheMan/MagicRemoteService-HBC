@@ -142,6 +142,9 @@ jobs:
           generate_release_notes: true
 
       - name: Notify webos-apps-repo of new release
+        # Best-effort: a missing/expired REPO_DISPATCH_TOKEN or an outage on
+        # the other repo shouldn't red-X a release that already succeeded.
+        continue-on-error: true
         run: |
           curl -sf -X POST \
             -H "Authorization: token ${{ secrets.REPO_DISPATCH_TOKEN }}" \

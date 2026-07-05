@@ -120,6 +120,7 @@
       <DependentUpon>BindControl.cs</DependentUpon>
     </Compile>
     <Compile Include="Bind.cs" />
+    <Compile Include="UpdateChecker.cs" />
     <Compile Include="Properties\Resources.Designer.cs">
       <AutoGen>True</AutoGen>
       <DesignTime>True</DesignTime>

@@ -127,11 +127,26 @@
   <data name="esappinfo" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\TV\MagicRemoteService\resources\es\appinfo.json;System.String, mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089;utf-8</value>
   </data>
+  <data name="ApplicationCheckForUpdate" xml:space="preserve">
+    <value>Check for Updates</value>
+  </data>
   <data name="ApplicationExit" xml:space="preserve">
     <value>Exit</value>
   </data>
   <data name="ApplicationSetting" xml:space="preserve">
     <value>Settings</value>
+  </data>
+  <data name="UpdateAvailableBalloonTitle" xml:space="preserve">
+    <value>Update available</value>
+  </data>
+  <data name="UpdateAvailableBalloonText" xml:space="preserve">
+    <value>MagicRemoteService {0} is available. Click here to download it.</value>
+  </data>
+  <data name="UpdateCheckFailedBalloonText" xml:space="preserve">
+    <value>Could not check for updates. See the Application event log for details.</value>
+  </data>
+  <data name="UpToDateBalloonText" xml:space="preserve">
+    <value>MagicRemoteService is up to date.</value>
   </data>
   <data name="icon" type="System.Resources.ResXFileRef, System.Windows.Forms">
     <value>..\Resources\TV\MagicRemoteService\icon.png;System.Byte[], mscorlib, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a</value>

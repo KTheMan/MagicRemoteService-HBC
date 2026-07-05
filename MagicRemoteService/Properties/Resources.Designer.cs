@@ -87,6 +87,15 @@ namespace MagicRemoteService.Properties {
         }
         
         /// <summary>
+        ///   Recherche une chaîne localisée semblable à Check for Updates.
+        /// </summary>
+        public static string ApplicationCheckForUpdate {
+            get {
+                return ResourceManager.GetString("ApplicationCheckForUpdate", resourceCulture);
+            }
+        }
+
+        /// <summary>
         ///   Recherche une chaîne localisée semblable à Exit.
         /// </summary>
         public static string ApplicationExit {
@@ -94,7 +103,7 @@ namespace MagicRemoteService.Properties {
                 return ResourceManager.GetString("ApplicationExit", resourceCulture);
             }
         }
-        
+
         /// <summary>
         ///   Recherche une chaîne localisée semblable à Settings.
         /// </summary>
@@ -103,7 +112,43 @@ namespace MagicRemoteService.Properties {
                 return ResourceManager.GetString("ApplicationSetting", resourceCulture);
             }
         }
-        
+
+        /// <summary>
+        ///   Recherche une chaîne localisée semblable à Update available.
+        /// </summary>
+        public static string UpdateAvailableBalloonTitle {
+            get {
+                return ResourceManager.GetString("UpdateAvailableBalloonTitle", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Recherche une chaîne localisée semblable à MagicRemoteService {0} is available. Click here to download it..
+        /// </summary>
+        public static string UpdateAvailableBalloonText {
+            get {
+                return ResourceManager.GetString("UpdateAvailableBalloonText", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Recherche une chaîne localisée semblable à Could not check for updates. See the Application event log for details..
+        /// </summary>
+        public static string UpdateCheckFailedBalloonText {
+            get {
+                return ResourceManager.GetString("UpdateCheckFailedBalloonText", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   Recherche une chaîne localisée semblable à MagicRemoteService is up to date..
+        /// </summary>
+        public static string UpToDateBalloonText {
+            get {
+                return ResourceManager.GetString("UpToDateBalloonText", resourceCulture);
+            }
+        }
+
         /// <summary>
         ///   Recherche une chaîne localisée semblable à {
         ///	&quot;strAppTittle&quot;: &quot;MagicRemoteService&quot;,

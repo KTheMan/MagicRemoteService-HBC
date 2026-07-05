@@ -117,11 +117,26 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
+  <data name="ApplicationCheckForUpdate" xml:space="preserve">
+    <value>Vérifier les mises à jour</value>
+  </data>
   <data name="ApplicationExit" xml:space="preserve">
     <value>Quitter</value>
   </data>
   <data name="ApplicationSetting" xml:space="preserve">
     <value>Paramètres</value>
+  </data>
+  <data name="UpdateAvailableBalloonTitle" xml:space="preserve">
+    <value>Mise à jour disponible</value>
+  </data>
+  <data name="UpdateAvailableBalloonText" xml:space="preserve">
+    <value>MagicRemoteService {0} est disponible. Cliquez ici pour le télécharger.</value>
+  </data>
+  <data name="UpdateCheckFailedBalloonText" xml:space="preserve">
+    <value>Impossible de vérifier les mises à jour. Consultez le journal des événements de l'application pour plus de détails.</value>
+  </data>
+  <data name="UpToDateBalloonText" xml:space="preserve">
+    <value>MagicRemoteService est à jour.</value>
   </data>
   <data name="IPAddressBoxErrorByteEntryMessage" xml:space="preserve">
     <value>{0} n'est pas une entrée valide. Veuillez spécifier une valeur comprise entre 1 et 255.</value>

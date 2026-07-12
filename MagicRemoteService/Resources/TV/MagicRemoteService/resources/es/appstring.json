@@ -74,5 +74,8 @@
 	"strConfigLongClickLabel": "Duración del clic largo (ms)",
 	"strConfigInputDirectLabel": "La entrada indica el estado de conexión directamente",
 	"strConfigNoProfiles": "Todavía no hay entradas configuradas. Seleccione \"Añadir entrada\" para configurar una.",
-	"strConfigValidationError": "Seleccione una entrada e introduzca una dirección IP, máscara de subred y dirección MAC válidas."
+	"strConfigValidationError": "Seleccione una entrada e introduzca una dirección IP, máscara de subred y dirección MAC válidas.",
+	"strConfigHealthChecking": "Comprobando...",
+	"strConfigHealthConnected": "Conectado",
+	"strConfigHealthUnreachable": "Inaccesible"
 }

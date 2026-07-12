@@ -80,5 +80,8 @@
 	"strConfigLongClickLabel": "Durée du clic long (ms)",
 	"strConfigInputDirectLabel": "L'entrée signale directement l'état de connexion",
 	"strConfigNoProfiles": "Aucune entrée configurée. Sélectionnez \"Ajouter une entrée\" pour en configurer une.",
-	"strConfigValidationError": "Veuillez choisir une entrée et renseigner une adresse IP, un masque de sous-réseau et une adresse MAC valides."
+	"strConfigValidationError": "Veuillez choisir une entrée et renseigner une adresse IP, un masque de sous-réseau et une adresse MAC valides.",
+	"strConfigHealthChecking": "Vérification...",
+	"strConfigHealthConnected": "Connecté",
+	"strConfigHealthUnreachable": "Injoignable"
 }

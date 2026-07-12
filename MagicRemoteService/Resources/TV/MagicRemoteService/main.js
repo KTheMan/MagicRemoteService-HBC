@@ -347,22 +347,39 @@ function SubscriptionInputStatus() {
 	});
 }
 
-// Checks whether the TV's currently active input matches one of the user's
-// saved profiles - if so, this launch was triggered by switching to a bound
-// input, so skip straight to the normal remote-control overlay. Otherwise
-// this is a plain Home-launcher open, so show the configuration screen.
+// webOS reports "eim" as the launchReason when the External Input Manager
+// launched this app because the TV switched to one of its bound inputs -
+// unverified against real hardware, but it's the documented signal for
+// telling that apart from every other way this app can start (Home
+// launcher, re-opening it while already sitting on a bound input, etc).
+function IsEimLaunch() {
+	try {
+		return typeof webOSSystem !== "undefined" && webOSSystem.launchReason === "eim";
+	} catch(eError) {
+		return false;
+	}
+}
+
+// Only ever jump straight into the remote-control overlay when this launch
+// was actually the TV switching to one of the user's bound inputs. Every
+// other launch - most importantly a plain Home-launcher open, even while
+// the TV happens to already be sitting on a bound input - always shows the
+// config/health screen instead, per explicit design: no overlay unless the
+// input itself triggered this launch.
 function ProbeActiveProfile(arrDevice) {
 	var arrProfile = ProfilesLoad();
 	var pMatch = null;
-	(arrDevice || []).forEach(function(dDevice) {
-		if(dDevice.activate) {
-			arrProfile.forEach(function(pProfile) {
-				if(pProfile.inputId === dDevice.id) {
-					pMatch = pProfile;
-				}
-			});
-		}
-	});
+	if(IsEimLaunch()) {
+		(arrDevice || []).forEach(function(dDevice) {
+			if(dDevice.activate) {
+				arrProfile.forEach(function(pProfile) {
+					if(pProfile.inputId === dDevice.id) {
+						pMatch = pProfile;
+					}
+				});
+			}
+		});
+	}
 	if(pMatch !== null) {
 		ActivateProfile(pMatch);
 	} else {
@@ -371,8 +388,11 @@ function ProbeActiveProfile(arrDevice) {
 }
 
 // One-shot re-check used right after the config screen adds/removes a
-// profile, so saving one while already on the matching input can switch
-// straight into remote-control mode without needing a relaunch.
+// profile. Goes through the same ProbeActiveProfile/IsEimLaunch gate as the
+// initial launch, so this still only activates the overlay if the running
+// session was itself an EIM-triggered launch - saving a profile from a
+// plain Home-launcher session stays on the config/health screen until the
+// user actually switches to that input.
 function RefreshActiveProfile() {
 	webOS.service.request("luna://com.webos.service.eim", {
 		method: "getAllInputStatus",
@@ -460,9 +480,11 @@ function EimRemoveDevice(fSuccess, fFailure) {
 
 // ---- Configuration screen ----
 //
-// Shown when Load()/ProbeActiveProfile() find no saved profile matching the
-// TV's current input - i.e. this was a plain Home-launcher open rather than
-// a switch to a bound HDMI input.
+// Shown whenever this launch wasn't webOS's External Input Manager switching
+// to one of the user's bound inputs (see IsEimLaunch/ProbeActiveProfile) -
+// i.e. a plain Home-launcher open, including one where the TV happens to
+// already be sitting on a bound input. Doubles as a health check: each
+// configured profile's PC-side connection is probed and reported here.
 
 var deConfig = document.getElementById("config");
 var deConfigList = document.getElementById("configList");
@@ -493,10 +515,12 @@ function ShowConfig(arrProfile) {
 }
 
 function HideConfig() {
+	AbortHealthChecks();
 	deConfig.style.display = "none";
 }
 
 function RenderConfigList(arrProfile) {
+	AbortHealthChecks();
 	deConfigList.innerHTML = "";
 	deConfigForm.style.display = "none";
 	if(arrProfile.length === 0) {
@@ -507,9 +531,17 @@ function RenderConfigList(arrProfile) {
 		arrProfile.forEach(function(pProfile) {
 			var deItem = document.createElement("div");
 			deItem.className = "config-list-item";
+			var deInfo = document.createElement("span");
+			deInfo.className = "config-list-info";
 			var deLabel = document.createElement("span");
+			deLabel.className = "config-list-label";
 			deLabel.innerText = pProfile.inputName + " - " + pProfile.sendIp;
-			deItem.appendChild(deLabel);
+			var deStatus = document.createElement("span");
+			deStatus.className = "config-health config-health-checking";
+			deStatus.innerText = oString.strConfigHealthChecking;
+			deInfo.appendChild(deLabel);
+			deInfo.appendChild(deStatus);
+			deItem.appendChild(deInfo);
 			var deButtonGroup = document.createElement("span");
 			var deEditButton = document.createElement("button");
 			deEditButton.type = "button";
@@ -528,8 +560,55 @@ function RenderConfigList(arrProfile) {
 			deButtonGroup.appendChild(deDeleteButton);
 			deItem.appendChild(deButtonGroup);
 			deConfigList.appendChild(deItem);
+			CheckProfileHealth(pProfile, deStatus);
 		});
 	}
+}
+
+// Health check for each configured profile's PC-side service, shown on the
+// config screen so a manual (non-EIM) launch reports whether the
+// configured desktop software instance(s) are actually reachable, without
+// requiring the full remote-control connection/overlay to be active.
+var arrHealthCheckSocket = [];
+function AbortHealthChecks() {
+	arrHealthCheckSocket.forEach(function(soc) {
+		soc.onopen = soc.onerror = soc.onclose = null;
+		if(soc.readyState === WebSocket.CONNECTING || soc.readyState === WebSocket.OPEN) {
+			soc.close();
+		}
+	});
+	arrHealthCheckSocket = [];
+}
+
+function CheckProfileHealth(pProfile, deStatus) {
+	var socHealth = new WebSocket("ws://" + pProfile.sendIp + ":" + pProfile.sendPort);
+	arrHealthCheckSocket.push(socHealth);
+	var bSettled = false;
+	var iTimeoutHealth = setTimeout(function() {
+		Settle(false);
+	}, 3000);
+	function Settle(bConnected) {
+		if(bSettled) {
+			return;
+		}
+		bSettled = true;
+		clearTimeout(iTimeoutHealth);
+		deStatus.innerText = bConnected ? oString.strConfigHealthConnected : oString.strConfigHealthUnreachable;
+		deStatus.className = "config-health " + (bConnected ? "config-health-ok" : "config-health-bad");
+		socHealth.onopen = socHealth.onerror = socHealth.onclose = null;
+		if(socHealth.readyState === WebSocket.CONNECTING || socHealth.readyState === WebSocket.OPEN) {
+			socHealth.close();
+		}
+	}
+	socHealth.onopen = function() {
+		Settle(true);
+	};
+	socHealth.onerror = function() {
+		Settle(false);
+	};
+	socHealth.onclose = function() {
+		Settle(false);
+	};
 }
 
 function PopulateConfigInputOptions(strSelectedInputId) {

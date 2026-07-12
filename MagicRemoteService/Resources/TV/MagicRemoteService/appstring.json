@@ -81,5 +81,8 @@
 	"strConfigLongClickLabel": "Long Click Duration (ms)",
 	"strConfigInputDirectLabel": "Input reports connection state directly",
 	"strConfigNoProfiles": "No inputs configured yet. Select \"Add Input\" to set one up.",
-	"strConfigValidationError": "Please choose an input and fill in a valid IP address, subnet mask, and MAC address."
+	"strConfigValidationError": "Please choose an input and fill in a valid IP address, subnet mask, and MAC address.",
+	"strConfigHealthChecking": "Checking...",
+	"strConfigHealthConnected": "Connected",
+	"strConfigHealthUnreachable": "Unreachable"
 }

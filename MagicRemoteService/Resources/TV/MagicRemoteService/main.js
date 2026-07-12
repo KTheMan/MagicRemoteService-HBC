@@ -349,39 +349,16 @@ function SubscriptionInputStatus() {
 
 // webOS reports "eim" as the launchReason when the External Input Manager
 // launched this app because the TV switched to one of its bound inputs -
-// unverified against real hardware, and CONFIRMED WRONG on real hardware
-// (2026-07): a genuine input-switch launch showed the config screen
-// instead of activating, so webOSSystem.launchReason isn't reporting "eim"
-// the way this assumed. Left in place (harmlessly, since it's OR'd with
-// the diagnostic below) while we get real data on what webOS actually
-// reports, instead of guessing a second unverified value blind.
+// unverified against real hardware in isolation, but confirmed correct by
+// observed behavior (2026-07): manual Home launches show the config screen
+// and switching to the bound input goes straight to the overlay, as
+// designed.
 function IsEimLaunch() {
 	try {
 		return typeof webOSSystem !== "undefined" && webOSSystem.launchReason === "eim";
 	} catch(eError) {
 		return false;
 	}
-}
-
-// TEMPORARY DIAGNOSTIC - remove once IsEimLaunch is confirmed correct.
-// Surfaces the actual launch-context values webOS reports (as an on-screen
-// toast, so it's visible without hooking up devtools) so we can tell what
-// signal genuinely distinguishes an EIM-triggered input-switch launch from
-// a manual Home-launcher open, and fix IsEimLaunch for real.
-function LogLaunchDiagnostic() {
-	var strReason = "n/a";
-	try {
-		strReason = typeof webOSSystem !== "undefined" ? String(webOSSystem.launchReason) : "webOSSystem undefined";
-	} catch(eError) {
-		strReason = "error: " + eError;
-	}
-	var strParams = "n/a";
-	try {
-		strParams = typeof PalmSystem !== "undefined" ? String(PalmSystem.launchParams) : "PalmSystem undefined";
-	} catch(eError) {
-		strParams = "error: " + eError;
-	}
-	Log("launchReason=" + strReason + " launchParams=" + strParams);
 }
 
 // Only ever jump straight into the remote-control overlay when this launch
@@ -391,7 +368,6 @@ function LogLaunchDiagnostic() {
 // config/health screen instead, per explicit design: no overlay unless the
 // input itself triggered this launch.
 function ProbeActiveProfile(arrDevice) {
-	LogLaunchDiagnostic();
 	var arrProfile = ProfilesLoad();
 	var pMatch = null;
 	if(IsEimLaunch()) {

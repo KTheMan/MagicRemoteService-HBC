@@ -118,59 +118,110 @@
 			height: 100%;
 			width: 100%;
 			box-sizing: border-box;
-			padding: 3rem;
+			padding: 4rem;
 			overflow: auto;
 			background: #14181c;
 			color: #E6E6E6;
 			pointer-events: auto;
+			font-size: 1.5rem;
 		}
 		#config .config-panel {
-			max-width: 40rem;
+			max-width: 56rem;
 			margin: 0 auto;
+		}
+		#config h1#configTitle {
+			font-size: 2.75rem;
+			margin: 0 0 2rem 0;
+		}
+		#config button {
+			border: none;
+			border-radius: 0.5rem;
+			background: #3a4149;
+			color: #E6E6E6;
+			cursor: pointer;
+			font-size: 1.5rem;
+			padding: 1rem 2rem;
+		}
+		#config button:hover, #config button:focus {
+			background: #4a545e;
+			outline: 0.15rem solid #6cb4ff;
+			outline-offset: 0.15rem;
+		}
+		#config #configAddButton {
+			background: #2e7d32;
+			margin-bottom: 2rem;
+		}
+		#config #configAddButton:hover, #config #configAddButton:focus {
+			background: #388e3c;
 		}
 		#config .config-row {
 			display: flex;
 			flex-flow: column;
-			margin-bottom: 1.25rem;
+			margin-bottom: 1.75rem;
 		}
 		#config .config-row label {
-			margin-bottom: 0.5rem;
-			font-size: 1.25rem;
+			margin-bottom: 0.75rem;
+			font-size: 1.5rem;
 		}
 		#config .config-row input, #config .config-row select {
-			font-size: 1.25rem;
-			padding: 0.5rem;
+			font-size: 1.5rem;
+			padding: 1rem 1.25rem;
+			border-radius: 0.5rem;
+			border: 0.15rem solid transparent;
+			background: #2a2f36;
+			color: #E6E6E6;
+			box-sizing: border-box;
+		}
+		#config .config-row input:focus, #config .config-row select:focus {
+			outline: none;
+			border-color: #6cb4ff;
 		}
 		#config .config-row.config-checkbox {
 			flex-flow: row;
 			align-items: center;
 		}
+		#config .config-row.config-checkbox input[type="checkbox"] {
+			width: 2rem;
+			height: 2rem;
+		}
 		#config .config-row.config-checkbox label {
-			margin: 0 0 0 0.5rem;
+			margin: 0 0 0 0.75rem;
 			order: 2;
 		}
 		#config .config-buttons {
 			flex-flow: row;
 			justify-content: flex-end;
+			margin-top: 2.5rem;
 		}
 		#config .config-buttons button {
-			margin-left: 1rem;
-			padding: 0.75rem 1.5rem;
-			font-size: 1.25rem;
+			margin-left: 1.25rem;
+		}
+		#config #configSaveButton {
+			background: #2e7d32;
+		}
+		#config #configSaveButton:hover, #config #configSaveButton:focus {
+			background: #388e3c;
 		}
 		#config .config-list-item {
 			display: flex;
 			justify-content: space-between;
 			align-items: center;
-			padding: 1rem;
-			margin-bottom: 0.5rem;
+			padding: 1.5rem;
+			margin-bottom: 1rem;
 			background: #2a2f36;
-			border-radius: 0.5rem;
-			font-size: 1.25rem;
+			border-radius: 0.75rem;
+			font-size: 1.5rem;
 		}
 		#config .config-list-item button {
-			margin-left: 0.5rem;
-			padding: 0.5rem 1rem;
+			margin-left: 0.75rem;
+			padding: 0.65rem 1.5rem;
+			font-size: 1.25rem;
+		}
+		#config .config-list-item button.btn-delete {
+			background: #7a2e2e;
+		}
+		#config .config-list-item button.btn-delete:hover, #config .config-list-item button.btn-delete:focus {
+			background: #963939;
 		}
 	</style>
 </head>
@@ -204,15 +255,19 @@
 			</div>
 			<div class="config-row">
 				<label id="configIpLabel" for="configIp"></label>
-				<input id="configIp" type="text" placeholder="192.168.1.50" />
+				<!-- type="tel" is the standard webOS convention for bringing up the
+				     numeric keypad (rather than the full keyboard) on a dotted
+				     numeric field like an IP address; type="number" rejects the
+				     dots outright. -->
+				<input id="configIp" type="tel" inputmode="decimal" placeholder="192.168.1.50" />
 			</div>
 			<div class="config-row">
 				<label id="configPortLabel" for="configPort"></label>
-				<input id="configPort" type="number" />
+				<input id="configPort" type="number" inputmode="numeric" />
 			</div>
 			<div class="config-row">
 				<label id="configMaskLabel" for="configMask"></label>
-				<input id="configMask" type="text" placeholder="255.255.255.0" />
+				<input id="configMask" type="tel" inputmode="decimal" placeholder="255.255.255.0" />
 			</div>
 			<div class="config-row">
 				<label id="configMacLabel" for="configMac"></label>

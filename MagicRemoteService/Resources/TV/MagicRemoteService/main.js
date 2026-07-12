@@ -519,6 +519,7 @@ function RenderConfigList(arrProfile) {
 			});
 			var deDeleteButton = document.createElement("button");
 			deDeleteButton.type = "button";
+			deDeleteButton.className = "btn-delete";
 			deDeleteButton.innerText = oString.strConfigDeleteProfile;
 			deDeleteButton.addEventListener("click", function() {
 				DeleteProfile(pProfile);

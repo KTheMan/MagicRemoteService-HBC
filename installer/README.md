@@ -19,7 +19,7 @@ release zip doesn't:
    - `MagicRemoteService.exe.config`
    - all `*.dll` dependencies
    - `es/` and `fr/` resource folders
-3. `makensis -DVERSION=1.3.0.0 MagicRemoteService.nsi`
+3. `makensis -DVERSION=1.3.0.2 MagicRemoteService.nsi`
 
 `payload/` is gitignored - it holds compiled binaries from a release,
 not source.

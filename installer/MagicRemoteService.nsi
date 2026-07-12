@@ -28,7 +28,7 @@
 !include "MUI2.nsh"
 
 !ifndef VERSION
-  !define VERSION "1.3.0.0"
+  !define VERSION "1.3.0.2"
 !endif
 
 Name "MagicRemoteService"

@@ -31,17 +31,19 @@ jobs:
           VERSION="${TAG#v}"
           APPINFO=MagicRemoteService/Resources/TV/MagicRemoteService/appinfo.json
           # ares-package rejects anything but exactly 3 dot-separated
-          # integers, but release tags follow this project's 4-part
-          # major.minor.build.revision (.NET assembly version) scheme.
-          # Drop the build segment and keep major.minor.revision, so
-          # successive point releases (which only bump revision) still
-          # produce distinct, increasing appinfo.json versions.
+          # integers. Release tags aren't guaranteed to be 3 parts (this
+          # project has tagged both x.y.z and x.y.z.w) - normalize
+          # whatever the tag is into exactly 3: pad short tags with
+          # zeros, and for a 4th (.NET-style build/revision) segment fold
+          # it into the 3rd slot instead of discarding it, so consecutive
+          # point releases still produce distinct, increasing versions.
           IFS='.' read -ra VPARTS <<< "$VERSION"
-          if [ "${#VPARTS[@]}" -ge 4 ]; then
-            APPINFO_VERSION="${VPARTS[0]}.${VPARTS[1]}.${VPARTS[3]}"
-          else
-            APPINFO_VERSION="$VERSION"
-          fi
+          case "${#VPARTS[@]}" in
+            0|1) APPINFO_VERSION="${VPARTS[0]:-0}.0.0" ;;
+            2) APPINFO_VERSION="${VPARTS[0]}.${VPARTS[1]}.0" ;;
+            3) APPINFO_VERSION="$VERSION" ;;
+            *) APPINFO_VERSION="${VPARTS[0]}.${VPARTS[1]}.${VPARTS[-1]}" ;;
+          esac
           jq --arg version "$APPINFO_VERSION" '.version = $version' "$APPINFO" > "$APPINFO.tmp"
           mv "$APPINFO.tmp" "$APPINFO"
 
@@ -102,6 +104,25 @@ jobs:
 
       - name: Restore NuGet packages
         run: nuget restore MagicRemoteService.sln
+
+      - name: Stamp release version into AssemblyInfo
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        run: |
+          $version = "${{ github.ref_name }}" -replace '^v', ''
+          # AssemblyVersion/AssemblyFileVersion need exactly 4 numeric parts -
+          # pad a shorter tag with zeros rather than requiring releases to
+          # always be tagged 4-part. This is the single source of truth for
+          # the release version now - no separate "bump version" commit
+          # needed before tagging.
+          $parts = $version -split '\.'
+          while ($parts.Length -lt 4) { $parts += '0' }
+          $version4 = ($parts[0..3] -join '.')
+          $path = "MagicRemoteService\Properties\AssemblyInfo.cs"
+          (Get-Content $path -Raw) `
+            -replace 'AssemblyVersion\("[\d\.]+"\)', "AssemblyVersion(`"$version4`")" `
+            -replace 'AssemblyFileVersion\("[\d\.]+"\)', "AssemblyFileVersion(`"$version4`")" |
+            Set-Content $path
 
       - name: Build PC app (Release)
         run: msbuild MagicRemoteService.sln /p:Configuration=Release /p:Platform="Any CPU" /clp:Summary /nologo

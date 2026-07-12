@@ -30,7 +30,19 @@ jobs:
           TAG="${GITHUB_REF#refs/tags/}"
           VERSION="${TAG#v}"
           APPINFO=MagicRemoteService/Resources/TV/MagicRemoteService/appinfo.json
-          jq --arg version "$VERSION" '.version = $version' "$APPINFO" > "$APPINFO.tmp"
+          # ares-package rejects anything but exactly 3 dot-separated
+          # integers, but release tags follow this project's 4-part
+          # major.minor.build.revision (.NET assembly version) scheme.
+          # Drop the build segment and keep major.minor.revision, so
+          # successive point releases (which only bump revision) still
+          # produce distinct, increasing appinfo.json versions.
+          IFS='.' read -ra VPARTS <<< "$VERSION"
+          if [ "${#VPARTS[@]}" -ge 4 ]; then
+            APPINFO_VERSION="${VPARTS[0]}.${VPARTS[1]}.${VPARTS[3]}"
+          else
+            APPINFO_VERSION="$VERSION"
+          fi
+          jq --arg version "$APPINFO_VERSION" '.version = $version' "$APPINFO" > "$APPINFO.tmp"
           mv "$APPINFO.tmp" "$APPINFO"
 
           ares-package \

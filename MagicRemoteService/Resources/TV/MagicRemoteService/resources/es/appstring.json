@@ -67,6 +67,7 @@
 	"strConfigSaveProfile": "Guardar",
 	"strConfigCancel": "Cancelar",
 	"strConfigInputLabel": "Entrada de vídeo",
+	"strConfigNameLabel": "Nombre de la conexión",
 	"strConfigPCIPLabel": "Dirección IP del ordenador",
 	"strConfigPCPortLabel": "Puerto del ordenador",
 	"strConfigPCMaskLabel": "Máscara de subred",

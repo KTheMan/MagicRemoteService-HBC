@@ -451,6 +451,10 @@ function ProfilesSave(arrProfile) {
 // deleteDevice is only called when removing the last remaining profile -
 // removing one of several just updates the local profile list.
 
+function DefaultConnectionName(pInput) {
+	return pInput.inputName + " (Magic Remote)";
+}
+
 function EimAddDevice(pProfile, fSuccess, fFailure) {
 	webOS.service.request("luna://com.webos.service.eim", {
 		method: "addDevice",
@@ -460,7 +464,7 @@ function EimAddDevice(pProfile, fSuccess, fFailure) {
 			mvpdIcon: "",
 			type: "MVPD_IP",
 			showPopup: true,
-			label: oString.strAppTittle,
+			label: pProfile.connectionName,
 			description: pProfile.inputName
 		},
 		onSuccess: fSuccess,
@@ -491,6 +495,7 @@ var deConfig = document.getElementById("config");
 var deConfigList = document.getElementById("configList");
 var deConfigForm = document.getElementById("configForm");
 var deConfigInput = document.getElementById("configInput");
+var deConfigName = document.getElementById("configName");
 var deConfigIp = document.getElementById("configIp");
 var deConfigPort = document.getElementById("configPort");
 var deConfigMask = document.getElementById("configMask");
@@ -503,6 +508,7 @@ function ShowConfig(arrProfile) {
 	document.getElementById("configTitle").innerText = oString.strAppTittle;
 	document.getElementById("configAddButton").innerText = oString.strConfigAddProfile;
 	document.getElementById("configInputLabel").innerText = oString.strConfigInputLabel;
+	document.getElementById("configNameLabel").innerText = oString.strConfigNameLabel;
 	document.getElementById("configIpLabel").innerText = oString.strConfigPCIPLabel;
 	document.getElementById("configPortLabel").innerText = oString.strConfigPCPortLabel;
 	document.getElementById("configMaskLabel").innerText = oString.strConfigPCMaskLabel;
@@ -536,7 +542,7 @@ function RenderConfigList(arrProfile) {
 			deInfo.className = "config-list-info";
 			var deLabel = document.createElement("span");
 			deLabel.className = "config-list-label";
-			deLabel.innerText = pProfile.inputName + " - " + pProfile.sendIp;
+			deLabel.innerText = (pProfile.connectionName || DefaultConnectionName(pProfile)) + " - " + pProfile.sendIp;
 			var deStatus = document.createElement("span");
 			deStatus.className = "config-health config-health-checking";
 			deStatus.innerText = oString.strConfigHealthChecking;
@@ -635,6 +641,14 @@ function OpenConfigForm(pProfile) {
 	strConfigEditingInputId = pProfile ? pProfile.inputId : null;
 	PopulateConfigInputOptions(pProfile ? pProfile.inputId : null);
 	deConfigInput.disabled = !!pProfile;
+	var pSelectedInput = arrInputList.filter(function(x) {
+		return x.inputId === deConfigInput.value;
+	})[0];
+	// Editing keeps whatever name was already saved (or, for a profile
+	// saved before this field existed, falls back to the same default a
+	// new one would get). Adding suggests a default the user can still
+	// freely rename before saving.
+	deConfigName.value = pProfile ? (pProfile.connectionName || DefaultConnectionName(pProfile)) : (pSelectedInput ? DefaultConnectionName(pSelectedInput) : "");
 	deConfigIp.value = pProfile ? pProfile.sendIp : "";
 	deConfigPort.value = pProfile ? pProfile.sendPort : 41230;
 	deConfigMask.value = pProfile ? pProfile.mask : "255.255.255.0";
@@ -666,6 +680,7 @@ function SaveConfigForm() {
 		inputId: pInput.inputId,
 		inputAppId: pInput.inputAppId,
 		inputName: pInput.inputName,
+		connectionName: deConfigName.value || DefaultConnectionName(pInput),
 		sendIp: deConfigIp.value,
 		sendPort: parseInt(deConfigPort.value, 10) || 41230,
 		mask: deConfigMask.value,
@@ -709,6 +724,22 @@ function DeleteProfile(pProfile) {
 
 document.getElementById("configAddButton").addEventListener("click", function() {
 	OpenConfigForm(null);
+});
+// Only relevant while adding (editing disables this select outright) -
+// re-suggest the default name as the chosen input changes, but only if
+// the user hasn't already typed something else over the previous default.
+deConfigInput.addEventListener("change", function() {
+	var pPrevInput = arrInputList.filter(function(x) {
+		return x.inputName + " (Magic Remote)" === deConfigName.value;
+	})[0];
+	if(!deConfigInput.disabled && (deConfigName.value === "" || pPrevInput)) {
+		var pNewInput = arrInputList.filter(function(x) {
+			return x.inputId === deConfigInput.value;
+		})[0];
+		if(pNewInput) {
+			deConfigName.value = DefaultConnectionName(pNewInput);
+		}
+	}
 });
 document.getElementById("configCancelButton").addEventListener("click", function() {
 	RenderConfigList(ProfilesLoad());

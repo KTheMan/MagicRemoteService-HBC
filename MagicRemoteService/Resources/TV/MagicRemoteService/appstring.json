@@ -74,6 +74,7 @@
 	"strConfigSaveProfile": "Save",
 	"strConfigCancel": "Cancel",
 	"strConfigInputLabel": "Video Input",
+	"strConfigNameLabel": "Connection Name",
 	"strConfigPCIPLabel": "Computer IP Address",
 	"strConfigPCPortLabel": "Computer Port",
 	"strConfigPCMaskLabel": "Subnet Mask",

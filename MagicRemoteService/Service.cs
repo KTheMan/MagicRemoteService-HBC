@@ -25,6 +25,12 @@ namespace MagicRemoteService {
 	public sealed class ClientConnectionInfo {
 		public System.Net.IPEndPoint RemoteEndPoint;
 		public System.DateTime ConnectedAt;
+		// Rough liveness signal only (not synchronized) - lets Diagnostics
+		// show whether mouse-position packets are actually arriving for
+		// this connection, since nothing else logs them (Log/LogIfDebug
+		// calls elsewhere would flood the event log at cursor-move rates).
+		public System.DateTime? LastPositionAt;
+		public int PositionCount;
 	}
 	public partial class Service : System.ServiceProcess.ServiceBase {
 		private volatile int iPort;
@@ -1122,11 +1128,19 @@ namespace MagicRemoteService {
 														piPositionRelative[0].u.mi.dx = System.BitConverter.ToInt16(tabData, (int)ulOffsetData + 1);
 														piPositionRelative[0].u.mi.dy = System.BitConverter.ToInt16(tabData, (int)ulOffsetData + 3);
 														Service.SendInputAdmin(piPositionRelative);
+														if(Service.dActiveClient.TryGetValue(socClient.GetHashCode(), out MagicRemoteService.ClientConnectionInfo cciRelative)) {
+															cciRelative.LastPositionAt = System.DateTime.Now;
+															cciRelative.PositionCount++;
+														}
 														break;
 													case (byte)MagicRemoteService.MessageType.PositionAbsolute:
 														piPositionAbsolute[0].u.mi.dx = ((scrDisplay.Bounds.X + ((scrDisplay.Bounds.Width * System.BitConverter.ToUInt16(tabData, (int)ulOffsetData + 1)) / 1920)) * 65535) / MagicRemoteService.Screen.DesktopBounds.Width;
 														piPositionAbsolute[0].u.mi.dy = ((scrDisplay.Bounds.Y + ((scrDisplay.Bounds.Height * System.BitConverter.ToUInt16(tabData, (int)ulOffsetData + 3)) / 1080)) * 65535) / MagicRemoteService.Screen.DesktopBounds.Height;
 														Service.SendInputAdmin(piPositionAbsolute);
+														if(Service.dActiveClient.TryGetValue(socClient.GetHashCode(), out MagicRemoteService.ClientConnectionInfo cciAbsolute)) {
+															cciAbsolute.LastPositionAt = System.DateTime.Now;
+															cciAbsolute.PositionCount++;
+														}
 														break;
 													case (byte)MagicRemoteService.MessageType.Wheel:
 														piWheel[0].u.mi.mouseData = (uint)(-System.BitConverter.ToInt16(tabData, (int)ulOffsetData + 1) * 3);

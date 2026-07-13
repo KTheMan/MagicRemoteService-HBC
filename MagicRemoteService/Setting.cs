@@ -247,6 +247,8 @@ namespace MagicRemoteService {
 			this.lvDiagnosticsClient.Columns.Add("Remote address", 220);
 			this.lvDiagnosticsClient.Columns.Add("Connected since", 160);
 			this.lvDiagnosticsClient.Columns.Add("Duration", 120);
+			this.lvDiagnosticsClient.Columns.Add("Last motion", 120);
+			this.lvDiagnosticsClient.Columns.Add("Motion count", 100);
 
 			// Added in the order they need to dock: bottom-most/fill last.
 			tabDiagnostics.Controls.Add(this.lvDiagnosticsClient);
@@ -308,6 +310,8 @@ namespace MagicRemoteService {
 				System.Windows.Forms.ListViewItem lvi = new System.Windows.Forms.ListViewItem(cci.RemoteEndPoint.ToString());
 				lvi.SubItems.Add(cci.ConnectedAt.ToString("T"));
 				lvi.SubItems.Add((System.DateTime.Now - cci.ConnectedAt).ToString(@"hh\:mm\:ss"));
+				lvi.SubItems.Add(cci.LastPositionAt.HasValue ? (System.DateTime.Now - cci.LastPositionAt.Value).ToString(@"hh\:mm\:ss") + " ago" : "never");
+				lvi.SubItems.Add(cci.PositionCount.ToString());
 				this.lvDiagnosticsClient.Items.Add(lvi);
 			}
 			this.lvDiagnosticsClient.EndUpdate();

@@ -73,6 +73,7 @@
 	"strConfigSaveProfile": "Enregistrer",
 	"strConfigCancel": "Annuler",
 	"strConfigInputLabel": "Entrée vidéo",
+	"strConfigNameLabel": "Nom de la connexion",
 	"strConfigPCIPLabel": "Adresse IP de l'ordinateur",
 	"strConfigPCPortLabel": "Port de l'ordinateur",
 	"strConfigPCMaskLabel": "Masque de sous-réseau",

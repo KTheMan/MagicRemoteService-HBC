@@ -367,7 +367,29 @@ function IsEimLaunch() {
 // the TV happens to already be sitting on a bound input - always shows the
 // config/health screen instead, per explicit design: no overlay unless the
 // input itself triggered this launch.
+// TEMPORARY DIAGNOSTIC - remove once the real signal is confirmed.
+// launchReason "eim" was reported working, then confirmed NOT working on
+// the actual EIM-input-click path (routes to config instead of overlay) -
+// casts a wide net across every launch-context field that might carry
+// the real signal, shown as an on-screen toast (no devtools needed).
+function LogLaunchDiagnostic(arrDevice) {
+	function Safe(fGet) {
+		try {
+			return JSON.stringify(fGet());
+		} catch(eError) {
+			return "error: " + eError;
+		}
+	}
+	Log(
+		"eimReason=" + Safe(function() { return webOSSystem.launchReason; }) +
+		" sysParams=" + Safe(function() { return webOSSystem.launchParams; }) +
+		" palmParams=" + Safe(function() { return PalmSystem.launchParams; }) +
+		" devices=" + Safe(function() { return arrDevice; })
+	);
+}
+
 function ProbeActiveProfile(arrDevice) {
+	LogLaunchDiagnostic(arrDevice);
 	var arrProfile = ProfilesLoad();
 	var pMatch = null;
 	if(IsEimLaunch()) {

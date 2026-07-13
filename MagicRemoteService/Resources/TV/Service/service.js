@@ -224,8 +224,6 @@ metWol.on("request", function(mMessage) {
 });
 
 if(bOverlay){
-	var strInputAppId = "com.webos.app.hdmi";
-
 	serService.activityManager.create("MagicRemoteServiceKeepAlive");
 
 	var dClose = {};
@@ -364,6 +362,46 @@ if(bOverlay){
 	var Crypto = require("crypto");
 	var Fs = require("fs");
 
+	// The TV app (main.js) owns which HDMI inputs are actually bound to a
+	// PC profile - this service context has no access to its localStorage,
+	// so it pushes the list here via setBoundInputs whenever a profile is
+	// added/removed, and it's persisted to survive a service restart.
+	var arrBoundInputAppId = [];
+	var strBoundInputAppIdPath = "./BoundInputAppId";
+	Fs.readFile(strBoundInputAppIdPath, { encoding: "utf8" }, function(eError, strData) {
+		if(!eError) {
+			try {
+				var arrParsed = JSON.parse(strData);
+				if(Array.isArray(arrParsed)) {
+					arrBoundInputAppId = arrParsed;
+				}
+			} catch(eParseError) {
+				ConsoleError("BoundInputAppId parse error [", eParseError, "]");
+			}
+		}
+	});
+
+	var metSetBoundInputs = serService.register("setBoundInputs");
+	metSetBoundInputs.on("request", function(mMessage) {
+		try {
+			arrBoundInputAppId = Array.isArray(mMessage.payload.arrInputAppId) ? mMessage.payload.arrInputAppId : [];
+			Fs.writeFile(strBoundInputAppIdPath, JSON.stringify(arrBoundInputAppId), { encoding: "utf8" }, function(eError) {
+				if(eError) {
+					ConsoleError("writeFile BoundInputAppId error [", eError, "]");
+				}
+			});
+			mMessage.respond({
+				returnValue: true
+			});
+		} catch(eError) {
+			mMessage.respond({
+				errorCode: "1",
+				errorText: eError.message,
+				returnValue: false
+			});
+		}
+	});
+
 	var bApp = false;
 	var strSsapClientKey = null;
 	var uiSsapId = 1;
@@ -459,25 +497,24 @@ if(bOverlay){
 												}), true, false, false, false, 0x1, 0), "binary");
 												break;
 											case "response":
-												switch(mMessage.payload.appId) {
-													case strInputAppId:
-														LogIfDebug("Get foreground app info launch");
-														bApp = true;
-														serService.call("luna://com.webos.applicationManager/launch", {
-															id: strAppId
-														});
-														break;
-													default:
-														if(bApp) {
-															LogIfDebug("Get foreground app info close");
-															bApp = false;
-															for(var uniqueToken in dClose) {
-																dClose[uniqueToken].respond({
-																	returnValue: true
-																});
-															} 
+												if(arrBoundInputAppId.indexOf(mMessage.payload.appId) !== -1) {
+													LogIfDebug("Get foreground app info launch", mMessage.payload.appId);
+													bApp = true;
+													serService.call("luna://com.webos.applicationManager/launch", {
+														id: strAppId,
+														params: {
+															magicRemoteAuto: true,
+															inputAppId: mMessage.payload.appId
 														}
-														break;
+													});
+												} else if(bApp) {
+													LogIfDebug("Get foreground app info close");
+													bApp = false;
+													for(var uniqueToken in dClose) {
+														dClose[uniqueToken].respond({
+															returnValue: true
+														});
+													}
 												}
 												break;
 										}

@@ -8,12 +8,7 @@
 
 	"strGetAllInputStatusSuccess": "Se ha obtenido correctamente el estado de todas las entradas",
 	"strGetAllInputStatusFailure": "Fallo al obtener el estado de todas las entradas",
-	"strAddDeviceSuccess": "Se ha añadido el dispositivo correctamente",
-	"strAddDeviceFailure": "Fallo al añadir dispositivo",
-	"strRemoveDeviceSuccess": "Se ha eliminado el dispositivo correctamente",
-	"strRemoveDeviceFailure": "Fallo al eliminar el dispositivo",
-	"strAddDeviceSuccess": "Se ha añadido el dispositivo correctamente",
-	"strAddDeviceFailure": "Fallo al añadir dispositivo",
+	"strSetBoundInputsFailure": "Fallo al actualizar las entradas asociadas",
 	"strRegisterScreenSaverRequestSubscribe": "Se ha iniciado la solicitud de registro del protector de pantalla",
 	"strRegisterScreenSaverRequestFailure": "Fallo al registrar la solicitud del protector de pantalla",
 	"strResponseScreenSaverRequestSuccess": "Respuesta correcta de la solicitud del protector de pantalla",

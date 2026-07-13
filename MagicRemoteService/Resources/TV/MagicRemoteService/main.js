@@ -308,7 +308,6 @@ function SubscriptionInputStatus() {
 					LogIfDebug(oString.strGetAllInputStatusSuccess);
 				case undefined:
 					if(pActive === null) {
-						ProbeActiveProfile(inResponse.devices);
 						break;
 					}
 					var pbLastInputSourceStatus = pbInputSourceStatus;
@@ -347,80 +346,24 @@ function SubscriptionInputStatus() {
 	});
 }
 
-// webOSSystem.launchReason was assumed to report "eim" for an EIM-triggered
-// launch, but confirmed (via a real device dump) to be undefined on this
-// webOS version - that guess never worked. The device list from
-// getAllInputStatus already carries a much more direct, confirmed signal:
-// it includes a synthetic entry for this app's own EIM registration
-// (id "MVPD_IP-" + strAppId) alongside the real physical inputs, and that
-// entry's activate flag is only true when the OS actually launched this
-// app by selecting it as an input - not on a plain Home-launcher open.
-function IsEimLaunch(arrDevice) {
-	return (arrDevice || []).some(function(dDevice) {
-		return dDevice.id === ("MVPD_IP-" + strAppId) && dDevice.activate === true;
-	});
-}
-
-// TEMPORARY DIAGNOSTIC - remove once confirmed. activate:true alone
-// regressed a plain Home-launcher open (after using the EIM input once,
-// it kept routing straight to the overlay) - activate likely reflects the
-// TV's persistent "current active input" state rather than "this launch
-// was just triggered by choosing it". The earlier device dump also showed
-// a chosen:true field alongside activate:true - dumping just this app's
-// own MVPD_IP entry to see whether chosen resets on a later Home-launcher
-// open while activate stays stuck true.
-function LogEimDeviceDiagnostic(arrDevice) {
-	var dEim = (arrDevice || []).filter(function(dDevice) {
-		return dDevice.id === ("MVPD_IP-" + strAppId);
-	})[0];
-	Log("eimDevice=" + JSON.stringify(dEim));
-}
-
-// Only ever jump straight into the remote-control overlay when this launch
-// was actually the TV switching to one of the user's bound inputs. Every
-// other launch - most importantly a plain Home-launcher open, even while
-// the TV happens to already be sitting on a bound input - always shows the
-// config/health screen instead, per explicit design: no overlay unless the
-// input itself triggered this launch.
-function ProbeActiveProfile(arrDevice) {
-	LogEimDeviceDiagnostic(arrDevice);
-	var arrProfile = ProfilesLoad();
-	var pMatch = null;
-	if(IsEimLaunch(arrDevice)) {
-		(arrDevice || []).forEach(function(dDevice) {
-			if(dDevice.activate) {
-				arrProfile.forEach(function(pProfile) {
-					if(pProfile.inputId === dDevice.id) {
-						pMatch = pProfile;
-					}
-				});
-			}
-		});
+// webOSSystem.launchReason/launchParams were confirmed useless for telling
+// a plain Home-launcher open apart from webOS switching the active input
+// (neither carries that signal on this platform). Rather than guess at a
+// platform signal, the on-TV service (service.js) now watches the bound
+// HDMI inputs itself via SSAP foreground-app monitoring and explicitly
+// calls launch() with its own marker params when one goes foreground - see
+// arrBoundInputAppId/setBoundInputs in service.js. Since we control those
+// params ourselves, reading them back here is unambiguous: present and
+// magicRemoteAuto === true means the service just switched us in for a
+// bound input; anything else (empty, or missing entirely) is a direct
+// launch - Home icon, relaunch, whatever - and always shows config.
+function LaunchParams() {
+	try {
+		var strParams = arrVersion[0] > 4 ? webOSSystem.launchParams : PalmSystem.launchParams;
+		return JSON.parse(strParams);
+	} catch(eError) {
+		return {};
 	}
-	if(pMatch !== null) {
-		ActivateProfile(pMatch);
-	} else {
-		ShowConfig(arrProfile);
-	}
-}
-
-// One-shot re-check used right after the config screen adds/removes a
-// profile. Goes through the same ProbeActiveProfile/IsEimLaunch gate as the
-// initial launch, so this still only activates the overlay if the running
-// session was itself an EIM-triggered launch - saving a profile from a
-// plain Home-launcher session stays on the config/health screen until the
-// user actually switches to that input.
-function RefreshActiveProfile() {
-	webOS.service.request("luna://com.webos.service.eim", {
-		method: "getAllInputStatus",
-		parameters: {},
-		onSuccess: function(inResponse) {
-			if(pActive === null) {
-				ProbeActiveProfile(inResponse.devices);
-			}
-		},
-		onFailure: function() {}
-	});
 }
 
 function ActivateProfile(pProfile) {
@@ -457,55 +400,64 @@ function ProfilesSave(arrProfile) {
 	localStorage.setItem(strProfilesKey, JSON.stringify(arrProfile));
 }
 
-// ---- EIM registration ----
+// ---- Bound-input registration (service.js) ----
 //
-// NOTE: unverified against real hardware. addDevice/deleteDevice only take a
-// single shared appId (there's no separate per-input identifier in the
-// payload), so it's not confirmed whether EIM can bind one appId to several
-// physical inputs independently, or whether deleteDevice for one profile
-// would also drop every other bound input under the same appId. To be safe,
-// deleteDevice is only called when removing the last remaining profile -
-// removing one of several just updates the local profile list.
+// Inputs used to be switched to via a virtual EIM device (addDevice), which
+// added its own "Magic Remote" entry to the TV's real input list alongside
+// the actual HDMI port - confusing, since selecting either one led here.
+// Now the real HDMI inputs are overlaid directly (see arrInputList/
+// LaunchInput), and service.js's foreground-app monitor is what switches us
+// in automatically; it just needs to know which inputAppIds are bound, since
+// it has no access to this page's localStorage.
 
 function DefaultConnectionName(pInput) {
 	return pInput.inputName + " (Magic Remote)";
 }
 
-function EimAddDevice(pProfile, fSuccess, fFailure) {
-	webOS.service.request("luna://com.webos.service.eim", {
-		method: "addDevice",
+function PushBoundInputs(arrProfile) {
+	webOS.service.request("luna://" + strAppId + ".service", {
+		method: "setBoundInputs",
 		parameters: {
-			appId: strAppId,
-			pigImage: "",
-			mvpdIcon: "",
-			type: "MVPD_IP",
-			showPopup: true,
-			label: pProfile.connectionName,
-			description: pProfile.inputName
+			arrInputAppId: arrProfile.map(function(pProfile) {
+				return pProfile.inputAppId;
+			})
 		},
-		onSuccess: fSuccess,
-		onFailure: fFailure
+		onSuccess: function() {},
+		onFailure: function(inError) {
+			Error(oString.strSetBoundInputsFailure + " [", inError.errorCode, ", ", inError.errorText, "]");
+		}
 	});
 }
 
-function EimRemoveDevice(fSuccess, fFailure) {
+// One-time cleanup for anyone upgrading from a build that registered the
+// old virtual EIM device - deleteDevice is a harmless no-op if there's
+// nothing to remove, so failure isn't worth reporting either way.
+const strEimCleanupKey = "MagicRemoteServiceEimCleanupDone";
+function CleanupLegacyEimDevice() {
+	if(localStorage.getItem(strEimCleanupKey) === "1") {
+		return;
+	}
 	webOS.service.request("luna://com.webos.service.eim", {
 		method: "deleteDevice",
 		parameters: {
 			appId: strAppId
 		},
-		onSuccess: fSuccess,
-		onFailure: fFailure
+		onSuccess: function() {
+			localStorage.setItem(strEimCleanupKey, "1");
+		},
+		onFailure: function() {
+			localStorage.setItem(strEimCleanupKey, "1");
+		}
 	});
 }
 
 // ---- Configuration screen ----
 //
-// Shown whenever this launch wasn't webOS's External Input Manager switching
-// to one of the user's bound inputs (see IsEimLaunch/ProbeActiveProfile) -
-// i.e. a plain Home-launcher open, including one where the TV happens to
-// already be sitting on a bound input. Doubles as a health check: each
-// configured profile's PC-side connection is probed and reported here.
+// Shown whenever this launch wasn't service.js switching us into one of the
+// user's bound inputs (see LaunchParams) - i.e. a plain Home-launcher open,
+// including one where the TV happens to already be sitting on a bound
+// input. Doubles as a health check: each configured profile's PC-side
+// connection is probed and reported here.
 
 var deConfig = document.getElementById("config");
 var deConfigList = document.getElementById("configList");
@@ -704,38 +656,22 @@ function SaveConfigForm() {
 		longClick: parseInt(deConfigLongClick.value, 10) || 1500,
 		inputDirect: deConfigInputDirect.checked
 	};
-	EimAddDevice(pProfile, function() {
-		LogIfDebug(oString.strAddDeviceSuccess);
-		var arrProfile = ProfilesLoad().filter(function(x) {
-			return x.inputId !== pProfile.inputId;
-		});
-		arrProfile.push(pProfile);
-		ProfilesSave(arrProfile);
-		RenderConfigList(arrProfile);
-		RefreshActiveProfile();
-	}, function(inError) {
-		Error(oString.strAddDeviceFailure + " [", inError.errorCode, ", ", inError.errorText, "]");
+	var arrProfile = ProfilesLoad().filter(function(x) {
+		return x.inputId !== pProfile.inputId;
 	});
+	arrProfile.push(pProfile);
+	ProfilesSave(arrProfile);
+	PushBoundInputs(arrProfile);
+	RenderConfigList(arrProfile);
 }
 
 function DeleteProfile(pProfile) {
 	var arrRemaining = ProfilesLoad().filter(function(x) {
 		return x.inputId !== pProfile.inputId;
 	});
-	function OnRemoved() {
-		ProfilesSave(arrRemaining);
-		RenderConfigList(arrRemaining);
-	}
-	if(arrRemaining.length === 0) {
-		EimRemoveDevice(function() {
-			LogIfDebug(oString.strRemoveDeviceSuccess);
-			OnRemoved();
-		}, function(inError) {
-			Error(oString.strRemoveDeviceFailure + " [", inError.errorCode, ", ", inError.errorText, "]");
-		});
-	} else {
-		OnRemoved();
-	}
+	ProfilesSave(arrRemaining);
+	PushBoundInputs(arrRemaining);
+	RenderConfigList(arrRemaining);
 }
 
 document.getElementById("configAddButton").addEventListener("click", function() {
@@ -1632,10 +1568,26 @@ function Load() {
 		}
 
 		SubscriptionLog();
-		// This decides config-screen vs remote-control mode by checking whether
-		// the TV's active input matches a saved profile - see ProbeActiveProfile.
+		CleanupLegacyEimDevice();
+
+		// Decides config-screen vs remote-control mode from the launch params
+		// service.js attaches when it's the one switching us into a bound
+		// input - see LaunchParams. Push the current profile list's inputAppIds
+		// every launch too, so service.js's persisted copy stays right even if
+		// it was never told (e.g. a fresh install of an older profile set).
 		// SubscriptionGetSensorData/SubscriptionDomEvent/SubscriptionClose/LaunchInput
 		// only start once ActivateProfile() picks a profile.
+		var arrProfile = ProfilesLoad();
+		PushBoundInputs(arrProfile);
+		var pParams = LaunchParams();
+		var pMatch = pParams.magicRemoteAuto === true ? arrProfile.filter(function(pProfile) {
+			return pProfile.inputAppId === pParams.inputAppId;
+		})[0] : undefined;
+		if(pMatch) {
+			ActivateProfile(pMatch);
+		} else {
+			ShowConfig(arrProfile);
+		}
 		SubscriptionInputStatus();
 	}
 }

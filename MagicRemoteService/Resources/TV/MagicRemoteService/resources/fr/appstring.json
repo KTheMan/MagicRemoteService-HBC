@@ -8,10 +8,7 @@
 
 	"strGetAllInputStatusSuccess": "Succès de la récupération l'état des entrées",
 	"strGetAllInputStatusFailure": "Echec de la récupération l'état des entrées",
-	"strAddDeviceSuccess": "Succès de l'ajout de l'appareil",
-	"strAddDeviceFailure": "Echec de l'ajout de l'appareil",
-	"strRemoveDeviceSuccess": "Succès de la suppression de l'appareil",
-	"strRemoveDeviceFailure": "Echec de la suppression de l'appareil",
+	"strSetBoundInputsFailure": "Echec de la mise à jour des entrées associées",
 	"strRegisterScreenSaverRequestSubscribe": "Début de l'abonnement à la demande d'écran de veille",
 	"strRegisterScreenSaverRequestFailure": "Echec de l'abonnement à la demande d'écran de veille",
 	"strResponseScreenSaverRequestSuccess": "Succès de la réponse à la demande d'écran de veille",

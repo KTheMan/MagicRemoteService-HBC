@@ -9,10 +9,7 @@
 
 	"strGetAllInputStatusSuccess": "Success to get all input status",
 	"strGetAllInputStatusFailure": "Failed to get all input status",
-	"strAddDeviceSuccess": "Success to add device",
-	"strAddDeviceFailure": "Failed to add device",
-	"strRemoveDeviceSuccess": "Success to remove device",
-	"strRemoveDeviceFailure": "Failed to remove device",
+	"strSetBoundInputsFailure": "Failed to update bound inputs",
 	"strRegisterScreenSaverRequestSubscribe": "Start to register screensaver request",
 	"strRegisterScreenSaverRequestFailure": "Failed to register screensaver request",
 	"strResponseScreenSaverRequestSuccess": "Success to response screensaver request",

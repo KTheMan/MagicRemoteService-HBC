@@ -361,6 +361,21 @@ function IsEimLaunch(arrDevice) {
 	});
 }
 
+// TEMPORARY DIAGNOSTIC - remove once confirmed. activate:true alone
+// regressed a plain Home-launcher open (after using the EIM input once,
+// it kept routing straight to the overlay) - activate likely reflects the
+// TV's persistent "current active input" state rather than "this launch
+// was just triggered by choosing it". The earlier device dump also showed
+// a chosen:true field alongside activate:true - dumping just this app's
+// own MVPD_IP entry to see whether chosen resets on a later Home-launcher
+// open while activate stays stuck true.
+function LogEimDeviceDiagnostic(arrDevice) {
+	var dEim = (arrDevice || []).filter(function(dDevice) {
+		return dDevice.id === ("MVPD_IP-" + strAppId);
+	})[0];
+	Log("eimDevice=" + JSON.stringify(dEim));
+}
+
 // Only ever jump straight into the remote-control overlay when this launch
 // was actually the TV switching to one of the user's bound inputs. Every
 // other launch - most importantly a plain Home-launcher open, even while
@@ -368,6 +383,7 @@ function IsEimLaunch(arrDevice) {
 // config/health screen instead, per explicit design: no overlay unless the
 // input itself triggered this launch.
 function ProbeActiveProfile(arrDevice) {
+	LogEimDeviceDiagnostic(arrDevice);
 	var arrProfile = ProfilesLoad();
 	var pMatch = null;
 	if(IsEimLaunch(arrDevice)) {

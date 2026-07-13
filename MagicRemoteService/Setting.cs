@@ -126,7 +126,13 @@ namespace MagicRemoteService {
 			this.PCDataRefresh();
 			this.TVDataRefresh();
 			this.RemoteDataRefresh();
-			this.TVRefresh_Click(this, new System.EventArgs());
+			// TVRefresh_Click shells out to ares-setup-device, which most
+			// people no longer have installed now that Homebrew Channel is
+			// the default path - only do this when the manual installer is
+			// actually opted into, not unconditionally on every launch.
+			if(this.cbShowManualInstaller.Checked) {
+				this.TVRefresh_Click(this, new System.EventArgs());
+			}
 		}
 
 		// The manual per-TV push installer (TVInstall_Click/AppExtract) is
@@ -184,9 +190,16 @@ namespace MagicRemoteService {
 				Padding = new System.Windows.Forms.Padding(12, 8, 12, 8),
 				Text = "Show manual installer"
 			};
+			bool bManualInstallerLoaded = false;
 			this.cbShowManualInstaller.CheckedChanged += delegate {
 				this.pnlManualInstaller.Visible = this.cbShowManualInstaller.Checked;
 				this.pnlHomebrewInfo.Visible = !this.cbShowManualInstaller.Checked;
+				// Only shell out to ares-setup-device the first time this
+				// gets checked, not unconditionally at every launch.
+				if(this.cbShowManualInstaller.Checked && !bManualInstallerLoaded) {
+					bManualInstallerLoaded = true;
+					this.TVRefresh_Click(this, System.EventArgs.Empty);
+				}
 			};
 
 			this.tabTV.Controls.Add(this.pnlManualInstaller);

@@ -1477,6 +1477,23 @@ function SendShutdown() {
 	}
 }
 
+// The overlay's own keydown listener (SubscriptionDomEvent) only exists
+// once a profile has activated, so there was previously no way at all to
+// leave this app from the config/health screen (a plain Home-launcher
+// open with no active input) short of force-closing it - a floating,
+// opaque, fullscreen window with nothing underneath to fall back to.
+// webOS's hardware/remote "Back" key is documented as keyCode 461;
+// closing the window here lets the OS return to whatever was showing
+// before (Home, or the previous input). Registered at top level so it
+// works in both config and overlay mode. Unverified against real
+// hardware - unlike the card-type default, floating windows may not
+// already fall back to system Back-key handling on their own.
+document.addEventListener("keydown", function(inEvent) {
+	if(inEvent.keyCode === 461) {
+		window.close();
+	}
+});
+
 webOS.service.request("luna://com.webos.service.tv.systemproperty", {
 	method: "getSystemInfo",
 	parameters: {

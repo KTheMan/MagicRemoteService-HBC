@@ -347,18 +347,18 @@ function SubscriptionInputStatus() {
 	});
 }
 
-// webOS reports "eim" as the launchReason when the External Input Manager
-// launched this app because the TV switched to one of its bound inputs -
-// unverified against real hardware in isolation, but confirmed correct by
-// observed behavior (2026-07): manual Home launches show the config screen
-// and switching to the bound input goes straight to the overlay, as
-// designed.
-function IsEimLaunch() {
-	try {
-		return typeof webOSSystem !== "undefined" && webOSSystem.launchReason === "eim";
-	} catch(eError) {
-		return false;
-	}
+// webOSSystem.launchReason was assumed to report "eim" for an EIM-triggered
+// launch, but confirmed (via a real device dump) to be undefined on this
+// webOS version - that guess never worked. The device list from
+// getAllInputStatus already carries a much more direct, confirmed signal:
+// it includes a synthetic entry for this app's own EIM registration
+// (id "MVPD_IP-" + strAppId) alongside the real physical inputs, and that
+// entry's activate flag is only true when the OS actually launched this
+// app by selecting it as an input - not on a plain Home-launcher open.
+function IsEimLaunch(arrDevice) {
+	return (arrDevice || []).some(function(dDevice) {
+		return dDevice.id === ("MVPD_IP-" + strAppId) && dDevice.activate === true;
+	});
 }
 
 // Only ever jump straight into the remote-control overlay when this launch
@@ -367,32 +367,10 @@ function IsEimLaunch() {
 // the TV happens to already be sitting on a bound input - always shows the
 // config/health screen instead, per explicit design: no overlay unless the
 // input itself triggered this launch.
-// TEMPORARY DIAGNOSTIC - remove once the real signal is confirmed.
-// launchReason "eim" was reported working, then confirmed NOT working on
-// the actual EIM-input-click path (routes to config instead of overlay) -
-// casts a wide net across every launch-context field that might carry
-// the real signal, shown as an on-screen toast (no devtools needed).
-function LogLaunchDiagnostic(arrDevice) {
-	function Safe(fGet) {
-		try {
-			return JSON.stringify(fGet());
-		} catch(eError) {
-			return "error: " + eError;
-		}
-	}
-	Log(
-		"eimReason=" + Safe(function() { return webOSSystem.launchReason; }) +
-		" sysParams=" + Safe(function() { return webOSSystem.launchParams; }) +
-		" palmParams=" + Safe(function() { return PalmSystem.launchParams; }) +
-		" devices=" + Safe(function() { return arrDevice; })
-	);
-}
-
 function ProbeActiveProfile(arrDevice) {
-	LogLaunchDiagnostic(arrDevice);
 	var arrProfile = ProfilesLoad();
 	var pMatch = null;
-	if(IsEimLaunch()) {
+	if(IsEimLaunch(arrDevice)) {
 		(arrDevice || []).forEach(function(dDevice) {
 			if(dDevice.activate) {
 				arrProfile.forEach(function(pProfile) {

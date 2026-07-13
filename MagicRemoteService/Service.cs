@@ -22,12 +22,28 @@ namespace MagicRemoteService {
 		Unicode = 0x05,
 		Shutdown = 0x06
 	}
+	public sealed class ClientConnectionInfo {
+		public System.Net.IPEndPoint RemoteEndPoint;
+		public System.DateTime ConnectedAt;
+	}
 	public partial class Service : System.ServiceProcess.ServiceBase {
 		private volatile int iPort;
 		private volatile bool bInactivity;
 		private volatile int iTimeoutInactivity;
 		private volatile bool bVideoInput;
 		private volatile int iTimeoutVideoInput;
+		// Diagnostics - populated for whichever process actually accepts
+		// the TCP socket and runs ThreadClient. In elevated ("Server"
+		// re-dispatching to a "Client" process) mode that's always the
+		// interactive Client process, which is also the one hosting the
+		// Setting UI, so reading these directly from Setting.cs is safe
+		// without any extra IPC.
+		public volatile bool bListening;
+		public static readonly System.Collections.Concurrent.ConcurrentDictionary<int, MagicRemoteService.ClientConnectionInfo> dActiveClient = new System.Collections.Concurrent.ConcurrentDictionary<int, MagicRemoteService.ClientConnectionInfo>();
+		public int ListenPort => this.iPort;
+		public static MagicRemoteService.ClientConnectionInfo[] GetActiveClients() {
+			return System.Linq.Enumerable.ToArray(Service.dActiveClient.Values);
+		}
 		private readonly System.Collections.Generic.Dictionary<ushort, Bind[]> dBind = new System.Collections.Generic.Dictionary<ushort, Bind[]>() {
 			{ 0x0001, null },
 			{ 0x0002, null },
@@ -443,6 +459,7 @@ namespace MagicRemoteService {
 						System.Net.Sockets.Socket socServer = new System.Net.Sockets.Socket(System.Net.Sockets.AddressFamily.InterNetwork, System.Net.Sockets.SocketType.Stream, System.Net.Sockets.ProtocolType.Tcp);
 						socServer.Bind(new System.Net.IPEndPoint(System.Net.IPAddress.Any, this.iPort));
 						socServer.Listen(10);
+						this.bListening = true;
 						System.Threading.AutoResetEvent areServerAcceptAsyncCompleted = new System.Threading.AutoResetEvent(false);
 						void ServerAcceptAsyncCompleted(object o, System.Net.Sockets.SocketAsyncEventArgs e) {
 							areServerAcceptAsyncCompleted.Set();
@@ -536,6 +553,7 @@ namespace MagicRemoteService {
 							}
 						} while(!Service.mreStop.WaitOne(System.TimeSpan.Zero));
 
+						this.bListening = false;
 						Service.ewhServerDisconnecting.Set();
 
 						if(pClient != null) {
@@ -566,6 +584,7 @@ namespace MagicRemoteService {
 						System.Net.Sockets.Socket socBoth = new System.Net.Sockets.Socket(System.Net.Sockets.AddressFamily.InterNetwork, System.Net.Sockets.SocketType.Stream, System.Net.Sockets.ProtocolType.Tcp);
 						socBoth.Bind(new System.Net.IPEndPoint(System.Net.IPAddress.Any, this.iPort));
 						socBoth.Listen(10);
+						this.bListening = true;
 						System.Threading.AutoResetEvent areBothAcceptAsyncCompleted = new System.Threading.AutoResetEvent(false);
 						void BothAcceptAsyncCompleted(object o, System.Net.Sockets.SocketAsyncEventArgs e) {
 							areBothAcceptAsyncCompleted.Set();
@@ -618,6 +637,7 @@ namespace MagicRemoteService {
 							return true;
 						});
 
+						this.bListening = false;
 						eaBothAcceptAsync.Completed -= BothAcceptAsyncCompleted;
 						eaBothAcceptAsync.Dispose();
 						areBothAcceptAsyncCompleted.Close();
@@ -1016,6 +1036,10 @@ namespace MagicRemoteService {
 
 							//TODO Something to ask TV if cursor visible
 							Service.Log("Client connected on socket [" + socClient.GetHashCode() + "]");
+							Service.dActiveClient[socClient.GetHashCode()] = new MagicRemoteService.ClientConnectionInfo {
+								RemoteEndPoint = (System.Net.IPEndPoint)socClient.RemoteEndPoint,
+								ConnectedAt = System.DateTime.Now
+							};
 							tPing.Start();
 							if(this.bInactivity) {
 								tInactivity.Start();
@@ -1248,10 +1272,12 @@ namespace MagicRemoteService {
 				areClientReceiveAsyncCompleted.Dispose();
 				socClient.Close();
 				socClient.Dispose();
+				Service.dActiveClient.TryRemove(socClient.GetHashCode(), out _);
 				Service.Log("Socket closed [" + socClient.GetHashCode() + "]");
 			} catch(System.Exception eException) {
 				MagicRemoteService.SystemCursor.SetDefaultSystemCursor();
 				MagicRemoteService.SystemCursor.SetDefaultMouseSpeedAccel();
+				Service.dActiveClient.TryRemove(socClient.GetHashCode(), out _);
 				Service.Error(eException.ToString());
 			}
 		}

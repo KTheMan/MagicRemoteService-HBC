@@ -120,6 +120,16 @@ Section "Install"
     MessageBox MB_ICONEXCLAMATION "Could not find InstallUtil.exe (.NET Framework 4.x) - the MagicRemoteService Windows Service was not registered. Verify .NET Framework 4.7.2+ is installed, then re-run this installer."
   installUtilDone:
 
+  ; The service listens for inbound TCP from the TV, which Windows Firewall
+  ; blocks by default on unprompted/non-interactive first run (the service
+  ; runs as SYSTEM before anyone ever opens Settings). Setting.cs's
+  ; PCDataSave() adds an equivalent app-based allow rule too, but only once
+  ; the user opens the app and saves PC settings - add it here as well so
+  ; it's in place immediately, and it works even for a Task Scheduler
+  ; (non-elevated) setup that never runs the elevated PCDataSave path.
+  nsExec::ExecToLog 'netsh advfirewall firewall delete rule name="MagicRemoteService"'
+  nsExec::ExecToLog 'netsh advfirewall firewall add rule name="MagicRemoteService" dir=in action=allow program="$INSTDIR\MagicRemoteService.exe" enable=yes profile=any'
+
   CreateDirectory "$SMPROGRAMS\MagicRemoteService"
   CreateShortcut "$SMPROGRAMS\MagicRemoteService\MagicRemoteService.lnk" "$INSTDIR\MagicRemoteService.exe"
   CreateShortcut "$SMPROGRAMS\MagicRemoteService\Uninstall.lnk" "$INSTDIR\Uninstall.exe"
@@ -135,6 +145,8 @@ SectionEnd
 
 Section "Uninstall"
   Call un.TeardownExisting
+
+  nsExec::ExecToLog 'netsh advfirewall firewall delete rule name="MagicRemoteService"'
 
   Call un.FindInstallUtil
   StrCmp $0 "" un.installUtilMissing

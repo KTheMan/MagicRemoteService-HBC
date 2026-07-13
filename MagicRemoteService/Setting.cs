@@ -23,6 +23,16 @@ namespace MagicRemoteService {
 
 		private readonly System.Collections.Generic.Dictionary<ushort, BindControl> dBindControl;
 
+		private System.Windows.Forms.Panel pnlManualInstaller;
+		private System.Windows.Forms.Panel pnlHomebrewInfo;
+		private System.Windows.Forms.CheckBox cbShowManualInstaller;
+
+		private System.Windows.Forms.Label labDiagnosticsListening;
+		private System.Windows.Forms.Label labDiagnosticsLocalIp;
+		private System.Windows.Forms.Label labDiagnosticsFirewall;
+		private System.Windows.Forms.ListView lvDiagnosticsClient;
+		private System.Windows.Forms.Timer tmrDiagnostics;
+
 		private decimal dListenPort;
 		private bool bInactivity;
 		private decimal dTimeoutInactivity;
@@ -111,10 +121,183 @@ namespace MagicRemoteService {
 				{ 0x019D, this.bcRemoteStop }
 			};
 			this.cbbDisplay.DataSource = new System.Collections.Generic.List<Screen>(System.Linq.Enumerable.Concat<Screen>(new System.Collections.Generic.List<Screen>() { Screen.PrimaryDefaut }, MagicRemoteService.Screen.AllScreen.Values));
+			this.SetupManualInstallerGate();
+			this.SetupDiagnosticsTab();
 			this.PCDataRefresh();
 			this.TVDataRefresh();
 			this.RemoteDataRefresh();
 			this.TVRefresh_Click(this, new System.EventArgs());
+		}
+
+		// The manual per-TV push installer (TVInstall_Click/AppExtract) is
+		// legacy now that the webOS app installs and stays installed via
+		// Homebrew Channel - this hides that flow behind an opt-in checkbox
+		// and points people at Homebrew Channel by default instead. Built in
+		// code rather than the designer/resx so none of the existing TV-tab
+		// controls' generated layout entries need touching.
+		private void SetupManualInstallerGate() {
+			System.Windows.Forms.Control[] tabManualInstallerControl = new System.Windows.Forms.Control[] {
+				this.cbbTV, this.btnTVRefresh, this.btnTVAdd, this.btnTVModify, this.btnTVRemove,
+				this.labTV, this.labInput, this.cbbInput, this.labDisplay, this.cbbDisplay,
+				this.labSendIP, this.iabSendIP, this.labTVPort, this.nbSendPort,
+				this.labSubnetMask, this.iabSubnetMask, this.labPCMac, this.pabPCMac,
+				this.labLongClick, this.nbLongClick, this.labTimeoutRightClickUnit,
+				this.cbInputDirect, this.cbOverlay, this.cbExtend,
+				this.btnTVInstall, this.btnTVInspect, this.btnTVVersion
+			};
+
+			this.pnlManualInstaller = new System.Windows.Forms.Panel {
+				Dock = System.Windows.Forms.DockStyle.Fill,
+				AutoScroll = true,
+				Visible = false
+			};
+			foreach(System.Windows.Forms.Control c in tabManualInstallerControl) {
+				this.tabTV.Controls.Remove(c);
+				this.pnlManualInstaller.Controls.Add(c);
+			}
+
+			this.pnlHomebrewInfo = new System.Windows.Forms.Panel {
+				Dock = System.Windows.Forms.DockStyle.Fill,
+				Visible = true
+			};
+			System.Windows.Forms.Label labHomebrewInfo = new System.Windows.Forms.Label {
+				Dock = System.Windows.Forms.DockStyle.Top,
+				AutoSize = false,
+				Height = 90,
+				Padding = new System.Windows.Forms.Padding(12),
+				Text = "MagicRemoteService for webOS now installs and updates itself through Homebrew Channel - no per-TV push needed. Install/update the TV app from there:"
+			};
+			System.Windows.Forms.LinkLabel llHomebrewChannel = new System.Windows.Forms.LinkLabel {
+				AutoSize = true,
+				Location = new System.Drawing.Point(12, 90),
+				Text = "https://github.com/KTheMan/webos-apps-repo"
+			};
+			llHomebrewChannel.LinkClicked += delegate {
+				System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo(llHomebrewChannel.Text) { UseShellExecute = true });
+			};
+			this.pnlHomebrewInfo.Controls.Add(llHomebrewChannel);
+			this.pnlHomebrewInfo.Controls.Add(labHomebrewInfo);
+
+			this.cbShowManualInstaller = new System.Windows.Forms.CheckBox {
+				Dock = System.Windows.Forms.DockStyle.Top,
+				AutoSize = true,
+				Padding = new System.Windows.Forms.Padding(12, 8, 12, 8),
+				Text = "Show manual installer"
+			};
+			this.cbShowManualInstaller.CheckedChanged += delegate {
+				this.pnlManualInstaller.Visible = this.cbShowManualInstaller.Checked;
+				this.pnlHomebrewInfo.Visible = !this.cbShowManualInstaller.Checked;
+			};
+
+			this.tabTV.Controls.Add(this.pnlManualInstaller);
+			this.tabTV.Controls.Add(this.pnlHomebrewInfo);
+			this.tabTV.Controls.Add(this.cbShowManualInstaller);
+		}
+
+		// Service-side connection diagnostics: is the listener actually
+		// bound, what IP(s) should the TV point at, does a firewall allow
+		// rule exist, and what (if anything) is currently connected. Also
+		// built in code for the same reason as SetupManualInstallerGate.
+		private void SetupDiagnosticsTab() {
+			System.Windows.Forms.TabPage tabDiagnostics = new System.Windows.Forms.TabPage("Diagnostics");
+
+			this.labDiagnosticsListening = new System.Windows.Forms.Label {
+				Dock = System.Windows.Forms.DockStyle.Top,
+				AutoSize = false,
+				Height = 24,
+				Padding = new System.Windows.Forms.Padding(12, 12, 12, 0)
+			};
+			this.labDiagnosticsLocalIp = new System.Windows.Forms.Label {
+				Dock = System.Windows.Forms.DockStyle.Top,
+				AutoSize = false,
+				Height = 24,
+				Padding = new System.Windows.Forms.Padding(12, 0, 12, 0)
+			};
+			this.labDiagnosticsFirewall = new System.Windows.Forms.Label {
+				Dock = System.Windows.Forms.DockStyle.Top,
+				AutoSize = false,
+				Height = 24,
+				Padding = new System.Windows.Forms.Padding(12, 0, 12, 0)
+			};
+			System.Windows.Forms.Label labDiagnosticsClientHeader = new System.Windows.Forms.Label {
+				Dock = System.Windows.Forms.DockStyle.Top,
+				AutoSize = false,
+				Height = 24,
+				Padding = new System.Windows.Forms.Padding(12, 12, 12, 0),
+				Text = "Connected TV(s):"
+			};
+			this.lvDiagnosticsClient = new System.Windows.Forms.ListView {
+				Dock = System.Windows.Forms.DockStyle.Fill,
+				View = System.Windows.Forms.View.Details,
+				FullRowSelect = true
+			};
+			this.lvDiagnosticsClient.Columns.Add("Remote address", 220);
+			this.lvDiagnosticsClient.Columns.Add("Connected since", 160);
+			this.lvDiagnosticsClient.Columns.Add("Duration", 120);
+
+			// Added in the order they need to dock: bottom-most/fill last.
+			tabDiagnostics.Controls.Add(this.lvDiagnosticsClient);
+			tabDiagnostics.Controls.Add(labDiagnosticsClientHeader);
+			tabDiagnostics.Controls.Add(this.labDiagnosticsFirewall);
+			tabDiagnostics.Controls.Add(this.labDiagnosticsLocalIp);
+			tabDiagnostics.Controls.Add(this.labDiagnosticsListening);
+
+			this.tabSetting.Controls.Add(tabDiagnostics);
+
+			this.RefreshDiagnostics();
+			this.tmrDiagnostics = new System.Windows.Forms.Timer { Interval = 2000 };
+			this.tmrDiagnostics.Tick += delegate {
+				this.RefreshDiagnostics();
+			};
+			this.tmrDiagnostics.Start();
+			this.FormClosed += delegate {
+				this.tmrDiagnostics.Stop();
+				this.tmrDiagnostics.Dispose();
+			};
+		}
+
+		private void RefreshDiagnostics() {
+			this.labDiagnosticsListening.Text = this.mrsService.bListening
+				? "Service: listening on port " + this.mrsService.ListenPort
+				: "Service: not listening";
+
+			System.Collections.Generic.List<string> liLocalIp = new System.Collections.Generic.List<string>();
+			foreach(System.Net.NetworkInformation.NetworkInterface ni in System.Net.NetworkInformation.NetworkInterface.GetAllNetworkInterfaces()) {
+				if(ni.OperationalStatus != System.Net.NetworkInformation.OperationalStatus.Up || ni.NetworkInterfaceType == System.Net.NetworkInformation.NetworkInterfaceType.Loopback) {
+					continue;
+				}
+				foreach(System.Net.NetworkInformation.UnicastIPAddressInformation uipai in ni.GetIPProperties().UnicastAddresses) {
+					if(uipai.Address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork) {
+						liLocalIp.Add(uipai.Address.ToString());
+					}
+				}
+			}
+			this.labDiagnosticsLocalIp.Text = "Point the TV's Computer IP at: " + (liLocalIp.Count == 0 ? "(none found)" : string.Join(", ", liLocalIp));
+
+			try {
+				NetFwTypeLib.INetFwPolicy2 nfp = (NetFwTypeLib.INetFwPolicy2)System.Activator.CreateInstance(System.Type.GetTypeFromProgID("HNetCfg.FwPolicy2"));
+				bool bFirewallRuleFound = false;
+				foreach(NetFwTypeLib.INetFwRule nfr in nfp.Rules) {
+					if(nfr.Name == "MagicRemoteService") {
+						bFirewallRuleFound = true;
+						break;
+					}
+				}
+				this.labDiagnosticsFirewall.Text = "Firewall allow rule: " + (bFirewallRuleFound ? "present" : "MISSING - inbound connections may be blocked");
+			} catch(System.Exception eException) {
+				this.labDiagnosticsFirewall.Text = "Firewall allow rule: unable to check (" + eException.Message + ")";
+			}
+
+			MagicRemoteService.ClientConnectionInfo[] tabClient = MagicRemoteService.Service.GetActiveClients();
+			this.lvDiagnosticsClient.BeginUpdate();
+			this.lvDiagnosticsClient.Items.Clear();
+			foreach(MagicRemoteService.ClientConnectionInfo cci in tabClient) {
+				System.Windows.Forms.ListViewItem lvi = new System.Windows.Forms.ListViewItem(cci.RemoteEndPoint.ToString());
+				lvi.SubItems.Add(cci.ConnectedAt.ToString("T"));
+				lvi.SubItems.Add((System.DateTime.Now - cci.ConnectedAt).ToString(@"hh\:mm\:ss"));
+				this.lvDiagnosticsClient.Items.Add(lvi);
+			}
+			this.lvDiagnosticsClient.EndUpdate();
 		}
 		private new bool Enabled {
 			set {

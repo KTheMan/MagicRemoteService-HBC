@@ -165,13 +165,12 @@ namespace MagicRemoteService {
 			switch(this.stType) {
 				case ServiceType.Server:
 				case ServiceType.Both:
+				case ServiceType.Client:
 					if(rkMagicRemoteService == null) {
 						this.iPort = 41230;
 					} else {
 						this.iPort = (int)rkMagicRemoteService.GetValue("Port", 41230);
 					}
-					break;
-				case ServiceType.Client:
 					break;
 			}
 			switch(this.stType) {
@@ -671,6 +670,7 @@ namespace MagicRemoteService {
 						System.IO.Pipes.NamedPipeClientStream psClient = new System.IO.Pipes.NamedPipeClientStream(".", "{2DCF2389-4969-483D-AA13-58FD8DDDD2D5}", System.IO.Pipes.PipeDirection.In, System.IO.Pipes.PipeOptions.Asynchronous);
 						Service.ewhClientConnecting.Set();
 						psClient.Connect();
+						this.bListening = true;
 						System.Diagnostics.Process pServer = psClient.GetServerProcess();
 						System.Collections.Generic.List<System.Threading.Thread> liClient = new System.Collections.Generic.List<System.Threading.Thread>();
 
@@ -725,6 +725,7 @@ namespace MagicRemoteService {
 							}
 						} while(!Service.mreStop.WaitOne(System.TimeSpan.Zero));
 
+						this.bListening = false;
 						psClient.Close();
 						psClient.Dispose();
 

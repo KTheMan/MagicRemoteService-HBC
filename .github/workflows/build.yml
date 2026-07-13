@@ -150,9 +150,22 @@ jobs:
 
       - name: Build installer
         run: |
-          $tag = "${{ github.ref_name }}"
-          $version = $tag -replace '^v', ''
-          & "${env:ProgramFiles(x86)}\NSIS\makensis.exe" "/DVERSION=$version" "installer\MagicRemoteService.nsi"
+          # Only a real tag push has a real version. A workflow_dispatch
+          # test build off a branch has no tag, so github.ref_name is just
+          # the branch name (e.g. "master") - passing that through as
+          # VERSION got written into the registry as-is by the installer,
+          # and Application.VersionScript() does `new Version(thatString)`
+          # unconditionally on every launch, which throws immediately for
+          # anything that isn't a valid numeric version and crashes the
+          # app before the tray icon ever shows. Skip -DVERSION entirely
+          # off-tag and let the .nsi's own hardcoded fallback (a real,
+          # parseable placeholder version) apply instead.
+          if ("${{ github.ref }}".StartsWith("refs/tags/")) {
+            $version = "${{ github.ref_name }}" -replace '^v', ''
+            & "${env:ProgramFiles(x86)}\NSIS\makensis.exe" "/DVERSION=$version" "installer\MagicRemoteService.nsi"
+          } else {
+            & "${env:ProgramFiles(x86)}\NSIS\makensis.exe" "installer\MagicRemoteService.nsi"
+          }
           Get-ChildItem installer\*.exe
 
       - name: Upload installer

@@ -31,6 +31,7 @@ namespace MagicRemoteService {
 		private System.Windows.Forms.Label labDiagnosticsLocalIp;
 		private System.Windows.Forms.Label labDiagnosticsFirewall;
 		private System.Windows.Forms.ListView lvDiagnosticsClient;
+		private System.Windows.Forms.TextBox txtDiagnosticsHistory;
 		private System.Windows.Forms.Timer tmrDiagnostics;
 
 		private decimal dListenPort;
@@ -240,7 +241,8 @@ namespace MagicRemoteService {
 				Text = "Connected TV(s):"
 			};
 			this.lvDiagnosticsClient = new System.Windows.Forms.ListView {
-				Dock = System.Windows.Forms.DockStyle.Fill,
+				Dock = System.Windows.Forms.DockStyle.Top,
+				Height = 150,
 				View = System.Windows.Forms.View.Details,
 				FullRowSelect = true
 			};
@@ -250,7 +252,28 @@ namespace MagicRemoteService {
 			this.lvDiagnosticsClient.Columns.Add("Last motion", 120);
 			this.lvDiagnosticsClient.Columns.Add("Motion count", 100);
 
+			// A live-only connected-client list misses anything that
+			// connects and disconnects between two polls (exactly what's in
+			// question when a connection isn't sticking) - show the actual
+			// event history underneath instead of needing Event Viewer.
+			System.Windows.Forms.Label labDiagnosticsHistoryHeader = new System.Windows.Forms.Label {
+				Dock = System.Windows.Forms.DockStyle.Top,
+				AutoSize = false,
+				Height = 24,
+				Padding = new System.Windows.Forms.Padding(12, 12, 12, 0),
+				Text = "Recent connection activity (newest last):"
+			};
+			this.txtDiagnosticsHistory = new System.Windows.Forms.TextBox {
+				Dock = System.Windows.Forms.DockStyle.Fill,
+				Multiline = true,
+				ReadOnly = true,
+				ScrollBars = System.Windows.Forms.ScrollBars.Vertical,
+				Font = new System.Drawing.Font(System.Drawing.FontFamily.GenericMonospace, 8f)
+			};
+
 			// Added in the order they need to dock: bottom-most/fill last.
+			tabDiagnostics.Controls.Add(this.txtDiagnosticsHistory);
+			tabDiagnostics.Controls.Add(labDiagnosticsHistoryHeader);
 			tabDiagnostics.Controls.Add(this.lvDiagnosticsClient);
 			tabDiagnostics.Controls.Add(labDiagnosticsClientHeader);
 			tabDiagnostics.Controls.Add(this.labDiagnosticsFirewall);
@@ -315,6 +338,13 @@ namespace MagicRemoteService {
 				this.lvDiagnosticsClient.Items.Add(lvi);
 			}
 			this.lvDiagnosticsClient.EndUpdate();
+
+			string strHistory = string.Join(System.Environment.NewLine, MagicRemoteService.Service.GetConnectionHistory());
+			if(this.txtDiagnosticsHistory.Text != strHistory) {
+				this.txtDiagnosticsHistory.Text = strHistory;
+				this.txtDiagnosticsHistory.SelectionStart = this.txtDiagnosticsHistory.Text.Length;
+				this.txtDiagnosticsHistory.ScrollToCaret();
+			}
 		}
 		private new bool Enabled {
 			set {

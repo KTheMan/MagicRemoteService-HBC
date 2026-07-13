@@ -50,6 +50,21 @@ namespace MagicRemoteService {
 		public static MagicRemoteService.ClientConnectionInfo[] GetActiveClients() {
 			return System.Linq.Enumerable.ToArray(Service.dActiveClient.Values);
 		}
+		// A live-only connection list misses anything that connects and
+		// disconnects between two 2-second Diagnostics polls, which is
+		// exactly what's in question here - keep a short rolling history of
+		// connect/disconnect events instead so Diagnostics can show it
+		// without needing Event Viewer at all.
+		public static readonly System.Collections.Concurrent.ConcurrentQueue<string> qConnectionHistory = new System.Collections.Concurrent.ConcurrentQueue<string>();
+		public static void LogConnectionHistory(string strEvent) {
+			Service.qConnectionHistory.Enqueue(System.DateTime.Now.ToString("T") + " " + strEvent);
+			while(Service.qConnectionHistory.Count > 50) {
+				Service.qConnectionHistory.TryDequeue(out _);
+			}
+		}
+		public static string[] GetConnectionHistory() {
+			return System.Linq.Enumerable.ToArray(Service.qConnectionHistory);
+		}
 		private readonly System.Collections.Generic.Dictionary<ushort, Bind[]> dBind = new System.Collections.Generic.Dictionary<ushort, Bind[]>() {
 			{ 0x0001, null },
 			{ 0x0002, null },
@@ -730,6 +745,7 @@ namespace MagicRemoteService {
 		private void ThreadClient(System.Net.Sockets.Socket socClient) {
 			try {
 				Service.Log("Socket accepted [" + socClient.GetHashCode() + "]");
+				Service.LogConnectionHistory("TCP accept " + socClient.RemoteEndPoint + " [" + socClient.GetHashCode() + "]");
 				byte[] tabData = new byte[4096];
 				System.Threading.AutoResetEvent areClientReceiveAsyncCompleted = new System.Threading.AutoResetEvent(false);
 				void ClientReceiveAsyncCompleted(object o, System.Net.Sockets.SocketAsyncEventArgs e) {
@@ -1046,6 +1062,7 @@ namespace MagicRemoteService {
 								RemoteEndPoint = (System.Net.IPEndPoint)socClient.RemoteEndPoint,
 								ConnectedAt = System.DateTime.Now
 							};
+							Service.LogConnectionHistory("WS handshake OK " + socClient.RemoteEndPoint + " [" + socClient.GetHashCode() + "]");
 							tPing.Start();
 							if(this.bInactivity) {
 								tInactivity.Start();
@@ -1286,12 +1303,20 @@ namespace MagicRemoteService {
 				areClientReceiveAsyncCompleted.Dispose();
 				socClient.Close();
 				socClient.Dispose();
-				Service.dActiveClient.TryRemove(socClient.GetHashCode(), out _);
+				if(Service.dActiveClient.TryRemove(socClient.GetHashCode(), out MagicRemoteService.ClientConnectionInfo cciRemoved)) {
+					Service.LogConnectionHistory("Disconnected " + cciRemoved.RemoteEndPoint + " [" + socClient.GetHashCode() + "] after " + (System.DateTime.Now - cciRemoved.ConnectedAt).ToString(@"hh\:mm\:ss") + ", " + cciRemoved.PositionCount + " motion msgs");
+				} else {
+					Service.LogConnectionHistory("Disconnected [" + socClient.GetHashCode() + "] (no WS handshake)");
+				}
 				Service.Log("Socket closed [" + socClient.GetHashCode() + "]");
 			} catch(System.Exception eException) {
 				MagicRemoteService.SystemCursor.SetDefaultSystemCursor();
 				MagicRemoteService.SystemCursor.SetDefaultMouseSpeedAccel();
-				Service.dActiveClient.TryRemove(socClient.GetHashCode(), out _);
+				if(Service.dActiveClient.TryRemove(socClient.GetHashCode(), out MagicRemoteService.ClientConnectionInfo cciRemovedError)) {
+					Service.LogConnectionHistory("Disconnected (error) " + cciRemovedError.RemoteEndPoint + " [" + socClient.GetHashCode() + "]: " + eException.Message);
+				} else {
+					Service.LogConnectionHistory("Disconnected (error) [" + socClient.GetHashCode() + "]: " + eException.Message);
+				}
 				Service.Error(eException.ToString());
 			}
 		}

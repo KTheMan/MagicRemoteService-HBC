@@ -27,25 +27,32 @@ jobs:
           # Homebrew Channel, which reads the installed app's own
           # appinfo.json to show "installed version") could never tell
           # what was actually installed.
-          TAG="${GITHUB_REF#refs/tags/}"
-          VERSION="${TAG#v}"
           APPINFO=MagicRemoteService/Resources/TV/MagicRemoteService/appinfo.json
-          # ares-package rejects anything but exactly 3 dot-separated
-          # integers. Release tags aren't guaranteed to be 3 parts (this
-          # project has tagged both x.y.z and x.y.z.w) - normalize
-          # whatever the tag is into exactly 3: pad short tags with
-          # zeros, and for a 4th (.NET-style build/revision) segment fold
-          # it into the 3rd slot instead of discarding it, so consecutive
-          # point releases still produce distinct, increasing versions.
-          IFS='.' read -ra VPARTS <<< "$VERSION"
-          case "${#VPARTS[@]}" in
-            0|1) APPINFO_VERSION="${VPARTS[0]:-0}.0.0" ;;
-            2) APPINFO_VERSION="${VPARTS[0]}.${VPARTS[1]}.0" ;;
-            3) APPINFO_VERSION="$VERSION" ;;
-            *) APPINFO_VERSION="${VPARTS[0]}.${VPARTS[1]}.${VPARTS[-1]}" ;;
-          esac
-          jq --arg version "$APPINFO_VERSION" '.version = $version' "$APPINFO" > "$APPINFO.tmp"
-          mv "$APPINFO.tmp" "$APPINFO"
+          # Only a real tag push is a release - workflow_dispatch (e.g. a
+          # test build off a branch) has no version to stamp, so leave
+          # appinfo.json's committed version as-is rather than mangling it
+          # with whatever GITHUB_REF happens to be (this previously tried
+          # to stamp "refs/heads/master.0.0", which ares-package rejects).
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            TAG="${GITHUB_REF#refs/tags/}"
+            VERSION="${TAG#v}"
+            # ares-package rejects anything but exactly 3 dot-separated
+            # integers. Release tags aren't guaranteed to be 3 parts (this
+            # project has tagged both x.y.z and x.y.z.w) - normalize
+            # whatever the tag is into exactly 3: pad short tags with
+            # zeros, and for a 4th (.NET-style build/revision) segment fold
+            # it into the 3rd slot instead of discarding it, so consecutive
+            # point releases still produce distinct, increasing versions.
+            IFS='.' read -ra VPARTS <<< "$VERSION"
+            case "${#VPARTS[@]}" in
+              0|1) APPINFO_VERSION="${VPARTS[0]:-0}.0.0" ;;
+              2) APPINFO_VERSION="${VPARTS[0]}.${VPARTS[1]}.0" ;;
+              3) APPINFO_VERSION="$VERSION" ;;
+              *) APPINFO_VERSION="${VPARTS[0]}.${VPARTS[1]}.${VPARTS[-1]}" ;;
+            esac
+            jq --arg version "$APPINFO_VERSION" '.version = $version' "$APPINFO" > "$APPINFO.tmp"
+            mv "$APPINFO.tmp" "$APPINFO"
+          fi
 
           ares-package \
             MagicRemoteService/Resources/TV/MagicRemoteService \
